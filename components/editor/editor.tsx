@@ -47,7 +47,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     const mounted = useMounted();
     const editorTheme = useEditorTheme();
     const [hasMinHeight, setHasMinHeight] = useState(true);
-    const toast = useToast();
+    // const toast = useToast(); // <--- 删除这一行
     const dictionary = useDictionary();
     const embeds = useEmbeds();
 
