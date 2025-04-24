@@ -163,38 +163,8 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         setHasMinHeight((backlinks?.length ?? 0) <= 0);
     }, [backlinks, isPreview]);
 
-    // 添加处理Markdown格式化命令的函数
-    const handleMarkdownCommand = useCallback((command: string) => {
-        if (!editorEl.current || !editorEl.current.view) return;
-        
-        console.log(`处理Markdown命令: ${command}`);
-        
-        // 根据命令类型执行相应操作
-        switch (command) {
-            case '*':
-            case '**':
-                // 强制刷新视图，确保格式化正确应用
-                setTimeout(() => {
-                    if (editorEl.current && editorEl.current.view) {
-                        editorEl.current.view.dispatch(editorEl.current.view.state.tr);
-                    }
-                }, 10);
-                break;
-            case '/':
-                // 处理斜杠命令，确保命令菜单显示
-                setTimeout(() => {
-                    if (editorEl.current && editorEl.current.view) {
-                        // 模拟斜杠命令触发
-                        const { state } = editorEl.current.view;
-                        editorEl.current.view.dispatch(state.tr.insertText('/'));
-                    }
-                }, 10);
-                break;
-            default:
-                break;
-        }
-    }, [editorEl]);
-
+    // 删除这里重复声明的handleMarkdownCommand函数
+    
     // 添加组合事件处理函数
     const handleCompositionStart = useCallback(() => {
         console.log('输入法组合开始');
