@@ -54,15 +54,14 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             inputMethodState.current = e.inputType === 'insertCompositionText' ? 'chinese' : 'english';
         };
 
-        if (editorEl.current) {
-            editorEl.current.addEventListener('inputmethodchange', handleInputMethodChange as EventListener);
-        }
+        if (editorEl.current && editorEl.current.element) {
+            const editorDom = editorEl.current.element;
+            editorDom.addEventListener('inputmethodchange', handleInputMethodChange as EventListener);
 
-        return () => {
-            if (editorEl.current) {
-                editorEl.current.removeEventListener('inputmethodchange', handleInputMethodChange as EventListener);
-            }
-        };
+            return () => {
+                editorDom.removeEventListener('inputmethodchange', handleInputMethodChange as EventListener);
+            };
+        }
     }, []);
 
     // 修改编辑器变化处理
