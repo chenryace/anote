@@ -169,6 +169,9 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             const timeSinceCompositionEnd = Date.now() - lastCompositionEndTime.current;
             const isJustAfterComposition = timeSinceCompositionEnd < 300;
             
+            // 记录事件类型，使用e参数避免TypeScript警告
+            console.log(`输入事件类型: ${e.type}，目标: ${e.target ? (e.target as HTMLElement).tagName : '未知'}`); 
+            
             // 如果刚刚完成组合输入
             if (isJustAfterComposition) {
                 console.log('输入事件：检测到刚刚完成组合输入');
