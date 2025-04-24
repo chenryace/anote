@@ -100,21 +100,15 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         const { state } = editorEl.current.view;
         const { from, to } = state.selection;
         
-        // 检查是否在组合输入状态
-        if (isComposing) {
-            // 如果是组合输入状态，将命令保存到pendingChars
-            pendingChars.current = command;
-            return;
-        }
-        
         // 处理特殊命令
         if (command === '/') {
-            // 触发命令菜单
+            // 清除当前选区内容
             editorEl.current.view.dispatch(
                 state.tr
                     .delete(from, to)
                     .insertText('/', from)
             );
+            
             // 确保命令菜单显示
             requestAnimationFrame(() => {
                 if (editorEl.current && editorEl.current.view) {
@@ -139,7 +133,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                 editorEl.current.view.dispatch(state.tr);
             }
         });
-    }, [editorEl, isComposing]);
+    }, [editorEl]);
 
     // 修改组合输入开始处理
     const handleCompositionStart = useCallback(() => {
@@ -199,18 +193,16 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         
         // 处理待处理的特殊字符
         if (pendingChars.current) {
-            // 如果是斜杠命令，特殊处理
-            if (pendingChars.current === '/' && inputMethodState.current === 'chinese') {
-                handleMarkdownCommand('/');
-            } else {
+            // 确保在非组合输入状态下处理命令
+            if (!isComposing) {
                 handleMarkdownCommand(pendingChars.current);
+                pendingChars.current = "";
             }
-            pendingChars.current = "";
         }
         
         // 触发编辑器变化
         handleEditorChange();
-    }, [editorEl, handleMarkdownCommand, handleEditorChange]);
+    }, [editorEl, handleMarkdownCommand, handleEditorChange, isComposing]);
 
     // 修改键盘事件处理
     const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
@@ -218,16 +210,25 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         
         // 处理特殊字符
         if (specialChars.includes(e.key)) {
-            if (isComposing) {
-                // 在中文输入法下，特殊处理斜杠
-                if (e.key === '/' && inputMethodState.current === 'chinese') {
-                    e.preventDefault();
+            // 在中文输入法下，特殊处理斜杠和其他命令
+            if (inputMethodState.current === 'chinese') {
+                e.preventDefault();
+                // 如果是斜杠，直接触发命令菜单
+                if (e.key === '/') {
                     handleMarkdownCommand('/');
                     return;
                 }
+                // 其他命令等待组合输入结束
                 pendingChars.current = e.key;
                 return;
             }
+            
+            // 非中文输入法状态下的处理
+            if (isComposing) {
+                pendingChars.current = e.key;
+                return;
+            }
+            
             e.preventDefault();
             handleMarkdownCommand(e.key);
         }
@@ -235,7 +236,6 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         // 处理数字选择
         if (isComposing && /^[1-9]$/.test(e.key)) {
             e.preventDefault();
-            // 让输入法处理数字选择
             return;
         }
     }, [isComposing, handleMarkdownCommand]);
