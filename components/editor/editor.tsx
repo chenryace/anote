@@ -6,7 +6,6 @@ import useMounted from 'libs/web/hooks/use-mounted';
 import Tooltip from './tooltip';
 import extensions from './extensions';
 import EditorState from 'libs/web/state/editor';
-import { useToast } from 'libs/web/hooks/use-toast';
 import { useDictionary } from './dictionary';
 import { useEmbeds } from './embeds';
 
