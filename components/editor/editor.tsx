@@ -96,6 +96,8 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         isEditorLocked.current = true;
         // 重置特殊字符处理标志
         needsSpecialCharHandling.current = false;
+        // 记录组合开始时间
+        lastCompositionEndTime.current = 0;
     }, []);
 
     const handleCompositionEnd = useCallback(() => {
@@ -114,6 +116,33 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         
         // 立即解锁编辑器
         isEditorLocked.current = false;
+        
+        // 检查最近是否有键盘操作（如Enter或数字键选词）
+        const timeSinceLastKeyPress = Date.now() - lastKeyPressTime.current;
+        const hasRecentKeyPress = timeSinceLastKeyPress < 300;
+        
+        // 如果最近有键盘操作，可能是通过Enter或数字键选词
+        if (hasRecentKeyPress) {
+            console.log('检测到可能的选词键盘操作，优化处理流程');
+            // 立即处理，不等待其他事件
+            setTimeout(() => {
+                // 确保编辑器状态正确
+                if (editorEl.current && editorEl.current.view) {
+                    try {
+                        // 发送一个空操作来刷新编辑器状态
+                        const { state } = editorEl.current.view;
+                        editorEl.current.view.dispatch(state.tr);
+                        
+                        // 确保编辑器接收键盘事件
+                        if (editorEl.current.element) {
+                            editorEl.current.element.focus();
+                        }
+                    } catch (err) {
+                        console.error('选词后刷新编辑器状态失败', err);
+                    }
+                }
+            }, 0);
+        }
         
         // 使用多层次的解锁机制确保编辑器状态正确恢复
         // 第一层：立即执行
@@ -149,7 +178,50 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                 }
             }
         });
-    }, [editorEl]);
+        
+        // 第三层：延迟执行，确保在所有事件处理完成后再次刷新状态
+        setTimeout(() => {
+            // 确保编辑器未锁定
+            isEditorLocked.current = false;
+            
+            // 如果有特殊字符需要处理
+            if (needsSpecialCharHandling.current && pendingChars.current) {
+                console.log(`延迟处理特殊字符: ${pendingChars.current}`);
+                
+                try {
+                    if (pendingChars.current.includes('/')) {
+                        handleMarkdownCommand('/');
+                    } else if (pendingChars.current.includes('*')) {
+                        handleMarkdownCommand('*');
+                    } else if (pendingChars.current.includes('#')) {
+                        handleMarkdownCommand('#');
+                    }
+                    
+                    // 重置待处理状态
+                    needsSpecialCharHandling.current = false;
+                    pendingChars.current = "";
+                } catch (err) {
+                    console.error('延迟处理特殊字符失败', err);
+                }
+            }
+            
+            // 确保编辑器状态正确
+            if (editorEl.current && editorEl.current.view) {
+                try {
+                    // 发送一个空操作来刷新编辑器状态
+                    const { state } = editorEl.current.view;
+                    editorEl.current.view.dispatch(state.tr);
+                    
+                    // 确保编辑器接收键盘事件
+                    if (editorEl.current.element) {
+                        editorEl.current.element.focus();
+                    }
+                } catch (err) {
+                    console.error('延迟刷新编辑器状态失败', err);
+                }
+            }
+        }, 50);
+    }, [editorEl, handleMarkdownCommand]);
 
     // 添加编辑器DOM引用的事件监听和MutationObserver
     useEffect(() => {
@@ -172,12 +244,13 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             // 记录事件类型，使用e参数避免TypeScript警告
             console.log(`输入事件类型: ${e.type}，目标: ${e.target ? (e.target as HTMLElement).tagName : '未知'}`); 
             
-            // 如果刚刚完成组合输入
-            if (isJustAfterComposition) {
-                console.log('输入事件：检测到刚刚完成组合输入');
-                
-                // 立即解锁编辑器
-                isEditorLocked.current = false;
+            // 无论是否刚刚完成组合输入，都尝试解锁编辑器
+            // 这是双重事件处理策略的一部分，确保无论事件触发顺序如何，都能正确处理输入
+            isEditorLocked.current = false;
+            
+            // 如果刚刚完成组合输入或者正在组合输入过程中
+            if (isJustAfterComposition || isComposing) {
+                console.log('输入事件：检测到输入活动');
                 
                 // 如果有特殊字符需要处理
                 if (needsSpecialCharHandling.current && pendingChars.current) {
@@ -200,6 +273,22 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                         console.error('处理特殊字符失败', err);
                     }
                 }
+                
+                // 确保编辑器状态正确
+                if (editorEl.current && editorEl.current.view) {
+                    try {
+                        // 发送一个空操作来刷新编辑器状态
+                        const { state } = editorEl.current.view;
+                        editorEl.current.view.dispatch(state.tr);
+                        
+                        // 确保编辑器接收键盘事件
+                        if (editorEl.current.element) {
+                            editorEl.current.element.focus();
+                        }
+                    } catch (err) {
+                        console.error('输入事件：刷新编辑器状态失败', err);
+                    }
+                }
             }
         };
         
@@ -208,9 +297,6 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         
         // 创建MutationObserver来监听DOM变化
         const observer = new MutationObserver((mutations) => {
-            // 如果不需要处理特殊字符，直接返回
-            if (!needsSpecialCharHandling.current) return;
-            
             // 检查是否有文本内容变化
             const hasTextChange = mutations.some(mutation => 
                 mutation.type === 'characterData' || 
@@ -219,35 +305,72 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                 mutation.removedNodes.length > 0
             );
             
+            // 检查是否刚刚完成了组合输入
+            const timeSinceCompositionEnd = Date.now() - lastCompositionEndTime.current;
+            const isJustAfterComposition = timeSinceCompositionEnd < 300;
+            
+            // 检查是否最近有键盘操作（如Enter或数字键选词）
+            const timeSinceLastKeyPress = Date.now() - lastKeyPressTime.current;
+            const hasRecentKeyPress = timeSinceLastKeyPress < 300;
+            
+            // 如果有文本变化，无论是否需要处理特殊字符，都确保编辑器状态正确
             if (hasTextChange) {
-                console.log(`MutationObserver：检测到DOM变化，处理特殊字符 ${pendingChars.current}`);
+                console.log(`MutationObserver：检测到DOM变化`);
                 
                 // 立即解锁编辑器
                 isEditorLocked.current = false;
                 
-                try {
-                    // 处理特殊字符
-                    if (pendingChars.current.includes('/')) {
-                        handleMarkdownCommand('/');
-                    } else if (pendingChars.current.includes('*')) {
-                        handleMarkdownCommand('*');
-                    } else if (pendingChars.current.includes('#')) {
-                        handleMarkdownCommand('#');
-                    }
+                // 如果需要处理特殊字符
+                if (needsSpecialCharHandling.current && pendingChars.current) {
+                    console.log(`MutationObserver：处理特殊字符 ${pendingChars.current}`);
                     
-                    // 重置待处理状态
-                    needsSpecialCharHandling.current = false;
-                    pendingChars.current = "";
-                    
-                    // 确保编辑器接收键盘事件
-                    if (editorEl.current && editorEl.current.element) {
-                        editorEl.current.element.focus();
+                    try {
+                        // 处理特殊字符
+                        if (pendingChars.current.includes('/')) {
+                            handleMarkdownCommand('/');
+                        } else if (pendingChars.current.includes('*')) {
+                            handleMarkdownCommand('*');
+                        } else if (pendingChars.current.includes('#')) {
+                            handleMarkdownCommand('#');
+                        }
+                        
+                        // 重置待处理状态
+                        needsSpecialCharHandling.current = false;
+                        pendingChars.current = "";
+                    } catch (err) {
+                        console.error('MutationObserver：处理特殊字符失败', err);
+                        // 出错时也重置状态，防止卡住
+                        needsSpecialCharHandling.current = false;
+                        pendingChars.current = "";
                     }
-                } catch (err) {
-                    console.error('MutationObserver：处理特殊字符失败', err);
-                    // 出错时也重置状态，防止卡住
-                    needsSpecialCharHandling.current = false;
-                    pendingChars.current = "";
+                }
+                
+                // 如果刚刚完成组合输入或有最近的键盘操作，额外确保编辑器状态正确
+                if (isJustAfterComposition || hasRecentKeyPress) {
+                    console.log('MutationObserver：检测到刚刚完成组合输入或有键盘操作，确保编辑器状态正确');
+                    
+                    // 使用setTimeout确保在DOM更新后执行
+                    setTimeout(() => {
+                        if (editorEl.current && editorEl.current.view) {
+                            try {
+                                // 发送一个空操作来刷新编辑器状态
+                                const { state } = editorEl.current.view;
+                                editorEl.current.view.dispatch(state.tr);
+                                
+                                // 确保编辑器接收键盘事件
+                                if (editorEl.current.element) {
+                                    editorEl.current.element.focus();
+                                }
+                            } catch (err) {
+                                console.error('MutationObserver：刷新编辑器状态失败', err);
+                            }
+                        }
+                    }, 10);
+                }
+                
+                // 确保编辑器接收键盘事件
+                if (editorEl.current && editorEl.current.element) {
+                    editorEl.current.element.focus();
                 }
             }
         });
@@ -342,6 +465,23 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         // 处理通过数字键选择候选词的情况
         if (isComposing && e.key >= '1' && e.key <= '9') {
             console.log(`组合输入中通过数字键选择候选词: ${e.key}`);
+            // 记录选词操作，用于后续处理
+            setTimeout(() => {
+                // 检查是否仍在组合状态，如果不是，说明选词已完成
+                if (!isComposing) {
+                    console.log(`数字键选词可能已完成: ${e.key}`);
+                    // 确保编辑器未锁定
+                    isEditorLocked.current = false;
+                    // 刷新编辑器状态
+                    if (editorEl.current && editorEl.current.view) {
+                        try {
+                            editorEl.current.view.dispatch(editorEl.current.view.state.tr);
+                        } catch (err) {
+                            console.error('数字键选词后刷新编辑器状态失败', err);
+                        }
+                    }
+                }
+            }, 10);
             // 不阻止默认行为，让输入法正常处理
             return;
         }
@@ -379,6 +519,32 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             console.log(`检测到键盘操作: ${e.key}`);
             // 强制解锁编辑器
             isEditorLocked.current = false;
+            
+            // 如果是Enter键，可能是在进行选词操作
+            if (e.key === 'Enter' && isComposing) {
+                console.log('检测到Enter键选词操作');
+                // 记录选词操作，用于后续处理
+                setTimeout(() => {
+                    // 检查是否已退出组合状态，如果是，说明选词已完成
+                    if (!isComposing) {
+                        console.log('Enter键选词已完成');
+                        // 确保编辑器未锁定
+                        isEditorLocked.current = false;
+                        // 刷新编辑器状态
+                        if (editorEl.current && editorEl.current.view) {
+                            try {
+                                editorEl.current.view.dispatch(editorEl.current.view.state.tr);
+                                // 确保编辑器接收键盘事件
+                                if (editorEl.current.element) {
+                                    editorEl.current.element.focus();
+                                }
+                            } catch (err) {
+                                console.error('Enter键选词后刷新编辑器状态失败', err);
+                            }
+                        }
+                    }
+                }, 10);
+            }
             
             // 如果编辑器存在，确保它能接收键盘事件
             if (editorEl.current && editorEl.current.element) {
