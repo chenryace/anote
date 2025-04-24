@@ -34,12 +34,13 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     const dictionary = useDictionary();
     const embeds = useEmbeds();
     
-    // 简化状态管理
+    // 状态管理
     const [isComposing, setIsComposing] = useState(false);
     const lastCompositionEndTime = useRef<number>(0);
     const compositionStartTime = useRef<number>(0);
     const pendingChars = useRef<string>("");
     const isEditorLocked = useRef<boolean>(false);
+    const lastInputValue = useRef<string>(""); // 跟踪最后一次输入值
 
     useEffect(() => {
         if (isPreview) return;
@@ -51,16 +52,40 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         if (!editorEl.current || !editorEl.current.view) return;
         
         const { state } = editorEl.current.view;
+        const { selection } = state;
+        
+        // 检查是否在组合输入状态
+        if (isComposing) {
+            // 如果是组合输入状态，将命令保存到pendingChars
+            pendingChars.current = command;
+            return;
+        }
+        
+        // 非组合输入状态下直接插入命令
         editorEl.current.view.dispatch(state.tr.insertText(command));
-    }, [editorEl]);
+        
+        // 确保编辑器状态正确
+        requestAnimationFrame(() => {
+            if (editorEl.current && editorEl.current.view) {
+                const { state } = editorEl.current.view;
+                editorEl.current.view.dispatch(state.tr);
+            }
+        });
+    }, [editorEl, isComposing]);
 
     // 组合输入开始处理
     const handleCompositionStart = useCallback(() => {
         setIsComposing(true);
         compositionStartTime.current = Date.now();
         pendingChars.current = "";
-        isEditorLocked.current = false; // 开始输入时解锁编辑器
-    }, []);
+        isEditorLocked.current = false;
+        
+        // 保存当前输入值
+        if (editorEl.current && editorEl.current.view) {
+            const { state } = editorEl.current.view;
+            lastInputValue.current = state.doc.textContent;
+        }
+    }, [editorEl]);
 
     // 组合输入结束处理
     const handleCompositionEnd = useCallback(() => {
@@ -75,11 +100,33 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         setIsComposing(false);
         isEditorLocked.current = false;
         
+        // 获取当前输入值
+        let currentValue = "";
+        if (editorEl.current && editorEl.current.view) {
+            const { state } = editorEl.current.view;
+            currentValue = state.doc.textContent;
+        }
+        
+        // 检查是否有重复输入
+        if (currentValue.includes(lastInputValue.current) && 
+            currentValue.length > lastInputValue.current.length) {
+            // 如果检测到重复输入，回退到上一次的状态
+            if (editorEl.current && editorEl.current.view) {
+                const { state } = editorEl.current.view;
+                editorEl.current.view.dispatch(
+                    state.tr.insertText(currentValue.replace(lastInputValue.current, ""))
+                );
+            }
+        }
+        
         // 处理待处理的特殊字符
         if (pendingChars.current) {
             handleMarkdownCommand(pendingChars.current);
             pendingChars.current = "";
         }
+        
+        // 更新最后一次输入值
+        lastInputValue.current = currentValue;
         
         // 确保编辑器状态正确
         if (editorEl.current && editorEl.current.view) {
@@ -124,9 +171,29 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             if (isComposing) {
                 return; // 组合输入时不处理
             }
+            
+            // 获取当前内容
+            const content = value();
+            
+            // 更新localStorage
+            if (note?.id) {
+                try {
+                    const notes = JSON.parse(localStorage.getItem('notes') || '{}');
+                    notes[note.id] = {
+                        ...note,
+                        content,
+                        updatedAt: new Date().toISOString()
+                    };
+                    localStorage.setItem('notes', JSON.stringify(notes));
+                } catch (err) {
+                    console.error('Failed to save to localStorage:', err);
+                }
+            }
+            
+            // 调用原始的onChange处理
             onEditorChange(value);
         },
-        [isComposing, onEditorChange]
+        [isComposing, onEditorChange, note]
     );
 
     // 设置编辑器事件监听
