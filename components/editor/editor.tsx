@@ -65,11 +65,41 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         };
     }, []);
 
-    // 处理Markdown命令
+    // 修改编辑器变化处理
+    const handleEditorChange = useCallback(() => {
+        if (!editorEl.current || !editorEl.current.view) return;
+        
+        const { state } = editorEl.current.view;
+        const content = state.doc.textContent;
+        
+        // 只在非组合输入状态下更新
+        if (!isComposing) {
+            // 更新localStorage
+            if (note?.id) {
+                try {
+                    const notes = JSON.parse(localStorage.getItem('notes') || '{}');
+                    notes[note.id] = {
+                        ...note,
+                        content,
+                        updatedAt: new Date().toISOString()
+                    };
+                    localStorage.setItem('notes', JSON.stringify(notes));
+                } catch (err) {
+                    console.error('Failed to save to localStorage:', err);
+                }
+            }
+            
+            // 调用原始的onChange处理
+            onEditorChange(() => content);
+        }
+    }, [isComposing, onEditorChange, note]);
+
+    // 修改Markdown命令处理
     const handleMarkdownCommand = useCallback((command: string) => {
         if (!editorEl.current || !editorEl.current.view) return;
         
         const { state } = editorEl.current.view;
+        const { from, to } = state.selection;
         
         // 检查是否在组合输入状态
         if (isComposing) {
@@ -78,8 +108,30 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             return;
         }
         
-        // 非组合输入状态下直接插入命令
-        editorEl.current.view.dispatch(state.tr.insertText(command));
+        // 处理特殊命令
+        if (command === '/') {
+            // 触发命令菜单
+            editorEl.current.view.dispatch(
+                state.tr
+                    .delete(from, to)
+                    .insertText('/', from)
+            );
+            // 确保命令菜单显示
+            requestAnimationFrame(() => {
+                if (editorEl.current && editorEl.current.view) {
+                    const { state } = editorEl.current.view;
+                    editorEl.current.view.dispatch(state.tr);
+                }
+            });
+            return;
+        }
+        
+        // 处理其他Markdown命令
+        editorEl.current.view.dispatch(
+            state.tr
+                .delete(from, to)
+                .insertText(command, from)
+        );
         
         // 确保编辑器状态正确
         requestAnimationFrame(() => {
@@ -148,10 +200,18 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         
         // 处理待处理的特殊字符
         if (pendingChars.current) {
-            handleMarkdownCommand(pendingChars.current);
+            // 如果是斜杠命令，特殊处理
+            if (pendingChars.current === '/' && inputMethodState.current === 'chinese') {
+                handleMarkdownCommand('/');
+            } else {
+                handleMarkdownCommand(pendingChars.current);
+            }
             pendingChars.current = "";
         }
-    }, [editorEl, handleMarkdownCommand]);
+        
+        // 触发编辑器变化
+        handleEditorChange();
+    }, [editorEl, handleMarkdownCommand, handleEditorChange]);
 
     // 修改键盘事件处理
     const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
@@ -180,19 +240,6 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             return;
         }
     }, [isComposing, handleMarkdownCommand]);
-
-    // 修改编辑器变化处理
-    const handleEditorChange = useCallback(() => {
-        if (!editorEl.current || !editorEl.current.view) return;
-        
-        const { state } = editorEl.current.view;
-        const content = state.doc.textContent;
-        
-        // 只在非组合输入状态下更新localStorage
-        if (!isComposing) {
-            localStorage.setItem('editorContent', content);
-        }
-    }, [isComposing]);
 
     // 设置编辑器事件监听
     useEffect(() => {
