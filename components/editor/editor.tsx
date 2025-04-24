@@ -59,6 +59,27 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         
         // 根据命令类型执行相应操作
         switch (command) {
+            case '/':
+                // 修改斜杠命令处理逻辑
+                if (editorEl.current && editorEl.current.view) {
+                    const { state, dispatch } = editorEl.current.view;
+                    const tr = state.tr;
+                    
+                    // 确保光标位置正确
+                    const pos = state.selection.from;
+                    tr.insertText('/', pos);
+                    
+                    // 立即执行更新
+                    dispatch(tr);
+                    
+                    // 确保命令菜单显示
+                    requestAnimationFrame(() => {
+                        if (editorEl.current && editorEl.current.element) {
+                            editorEl.current.element.focus();
+                        }
+                    });
+                }
+                break;
             case '*':
             case '**':
                 // 强制刷新视图，确保格式化正确应用
@@ -364,40 +385,14 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         if (isComposing && e.key >= '1' && e.key <= '9') {
             console.log(`组合输入中通过数字键选择候选词: ${e.key}`);
             
-            // 立即解锁编辑器状态
-            isEditorLocked.current = false;
+            // 不要立即解锁编辑器状态，等待 compositionend 事件
+            // isEditorLocked.current = false;  // 删除这行
             
-            // 主动触发一个合成结束事件，强制结束组合状态
-            if (editorEl.current && editorEl.current.element) {
-                try {
-                    // 创建并分发一个合成结束事件
-                    const compositionEndEvent = new Event('compositionend');
-                    editorEl.current.element.dispatchEvent(compositionEndEvent);
-                    console.log('已主动触发compositionend事件');
-                } catch (err) {
-                    console.error('触发compositionend事件失败', err);
-                }
-            }
+            // 不要主动触发 compositionend 事件，让输入法自然完成选词
+            // 删除手动触发 compositionEndEvent 的代码
             
-            // 记录选词操作，用于后续处理
-            setTimeout(() => {
-                // 无论是否仍在组合状态，都确保编辑器未锁定
-                isEditorLocked.current = false;
-                console.log(`数字键选词处理: ${e.key}`);
-                
-                // 刷新编辑器状态
-                if (editorEl.current && editorEl.current.view) {
-                    try {
-                        editorEl.current.view.dispatch(editorEl.current.view.state.tr);
-                        // 确保编辑器接收键盘事件
-                        if (editorEl.current.element) {
-                            editorEl.current.element.focus();
-                        }
-                    } catch (err) {
-                        console.error('数字键选词后刷新编辑器状态失败', err);
-                    }
-                }
-            }, 10);
+            // 仅记录选词意图
+            lastKeyPressTime.current = Date.now();
             
             // 不阻止默认行为，让输入法正常处理
             return;
