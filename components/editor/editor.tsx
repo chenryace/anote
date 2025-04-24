@@ -100,26 +100,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         const { state } = editorEl.current.view;
         const { from, to } = state.selection;
         
-        // 处理特殊命令
-        if (command === '/') {
-            // 清除当前选区内容并插入斜杠
-            editorEl.current.view.dispatch(
-                state.tr
-                    .delete(from, to)
-                    .insertText('/', from)
-            );
-            
-            // 确保命令菜单显示
-            requestAnimationFrame(() => {
-                if (editorEl.current && editorEl.current.view) {
-                    const { state } = editorEl.current.view;
-                    editorEl.current.view.dispatch(state.tr);
-                }
-            });
-            return;
-        }
-        
-        // 处理其他Markdown命令
+        // 处理所有命令
         editorEl.current.view.dispatch(
             state.tr
                 .delete(from, to)
@@ -193,16 +174,13 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         
         // 处理待处理的特殊字符
         if (pendingChars.current) {
-            // 确保在非组合输入状态下处理命令
-            if (!isComposing) {
-                handleMarkdownCommand(pendingChars.current);
-                pendingChars.current = "";
-            }
+            handleMarkdownCommand(pendingChars.current);
+            pendingChars.current = "";
         }
         
         // 触发编辑器变化
         handleEditorChange();
-    }, [editorEl, handleMarkdownCommand, handleEditorChange, isComposing]);
+    }, [editorEl, handleMarkdownCommand, handleEditorChange]);
 
     // 修改键盘事件处理
     const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
@@ -210,36 +188,16 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         
         // 处理特殊字符
         if (specialChars.includes(e.key)) {
-            // 在中文输入法下，特殊处理斜杠
-            if (inputMethodState.current === 'chinese' && e.key === '/') {
-                e.preventDefault();
-                // 直接插入斜杠并触发命令菜单
-                if (editorEl.current && editorEl.current.view) {
-                    const { state } = editorEl.current.view;
-                    const { from, to } = state.selection;
-                    editorEl.current.view.dispatch(
-                        state.tr
-                            .delete(from, to)
-                            .insertText('/', from)
-                    );
-                    // 确保命令菜单显示
-                    requestAnimationFrame(() => {
-                        if (editorEl.current && editorEl.current.view) {
-                            const { state } = editorEl.current.view;
-                            editorEl.current.view.dispatch(state.tr);
-                        }
-                    });
-                }
-                return;
-            }
+            // 阻止默认行为
+            e.preventDefault();
             
-            // 非中文输入法状态下的处理
+            // 如果是组合输入状态，保存命令
             if (isComposing) {
                 pendingChars.current = e.key;
                 return;
             }
             
-            e.preventDefault();
+            // 直接处理命令
             handleMarkdownCommand(e.key);
         }
         
@@ -248,7 +206,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             e.preventDefault();
             return;
         }
-    }, [isComposing, handleMarkdownCommand, editorEl]);
+    }, [isComposing, handleMarkdownCommand]);
 
     // 设置编辑器事件监听
     useEffect(() => {
