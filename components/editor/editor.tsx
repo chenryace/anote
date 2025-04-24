@@ -52,7 +52,6 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         if (!editorEl.current || !editorEl.current.view) return;
         
         const { state } = editorEl.current.view;
-        const { selection } = state;
         
         // 检查是否在组合输入状态
         if (isComposing) {
