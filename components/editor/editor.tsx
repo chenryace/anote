@@ -174,13 +174,33 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         
         // 处理待处理的特殊字符
         if (pendingChars.current) {
-            handleMarkdownCommand(pendingChars.current);
+            if (editorEl.current && editorEl.current.view) {
+                const { state } = editorEl.current.view;
+                const { from, to } = state.selection;
+                
+                // 插入命令字符
+                editorEl.current.view.dispatch(
+                    state.tr
+                        .delete(from, to)
+                        .insertText(pendingChars.current, from)
+                );
+                
+                // 如果是斜杠命令，确保命令菜单显示
+                if (pendingChars.current === '/') {
+                    requestAnimationFrame(() => {
+                        if (editorEl.current && editorEl.current.view) {
+                            const { state } = editorEl.current.view;
+                            editorEl.current.view.dispatch(state.tr);
+                        }
+                    });
+                }
+            }
             pendingChars.current = "";
         }
         
         // 触发编辑器变化
         handleEditorChange();
-    }, [editorEl, handleMarkdownCommand, handleEditorChange]);
+    }, [editorEl, handleEditorChange]);
 
     // 修改键盘事件处理
     const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
@@ -198,7 +218,27 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             }
             
             // 直接处理命令
-            handleMarkdownCommand(e.key);
+            if (editorEl.current && editorEl.current.view) {
+                const { state } = editorEl.current.view;
+                const { from, to } = state.selection;
+                
+                // 插入命令字符
+                editorEl.current.view.dispatch(
+                    state.tr
+                        .delete(from, to)
+                        .insertText(e.key, from)
+                );
+                
+                // 如果是斜杠命令，确保命令菜单显示
+                if (e.key === '/') {
+                    requestAnimationFrame(() => {
+                        if (editorEl.current && editorEl.current.view) {
+                            const { state } = editorEl.current.view;
+                            editorEl.current.view.dispatch(state.tr);
+                        }
+                    });
+                }
+            }
         }
         
         // 处理数字选择
@@ -206,7 +246,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             e.preventDefault();
             return;
         }
-    }, [isComposing, handleMarkdownCommand]);
+    }, [isComposing, editorEl]);
 
     // 设置编辑器事件监听
     useEffect(() => {
