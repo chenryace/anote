@@ -36,16 +36,34 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     
     // 状态管理
     const [isComposing, setIsComposing] = useState(false);
-    const lastCompositionEndTime = useRef<number>(0);
-    const compositionStartTime = useRef<number>(0);
-    const pendingChars = useRef<string>("");
-    const isEditorLocked = useRef<boolean>(false);
-    const lastInputValue = useRef<string>(""); // 跟踪最后一次输入值
+    const compositionStartTime = useRef(0);
+    const lastCompositionEndTime = useRef(0);
+    const pendingChars = useRef("");
+    const isEditorLocked = useRef(false);
+    const lastInputValue = useRef("");
+    const inputMethodState = useRef<'chinese' | 'english'>('english');
 
     useEffect(() => {
         if (isPreview) return;
         setHasMinHeight((backlinks?.length ?? 0) <= 0);
     }, [backlinks, isPreview]);
+
+    // 添加输入法状态监听
+    useEffect(() => {
+        const handleInputMethodChange = (e: InputEvent) => {
+            inputMethodState.current = e.inputType === 'insertCompositionText' ? 'chinese' : 'english';
+        };
+
+        if (editorEl.current) {
+            editorEl.current.addEventListener('inputmethodchange', handleInputMethodChange as EventListener);
+        }
+
+        return () => {
+            if (editorEl.current) {
+                editorEl.current.removeEventListener('inputmethodchange', handleInputMethodChange as EventListener);
+            }
+        };
+    }, []);
 
     // 处理Markdown命令
     const handleMarkdownCommand = useCallback((command: string) => {
@@ -72,21 +90,22 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         });
     }, [editorEl, isComposing]);
 
-    // 组合输入开始处理
+    // 修改组合输入开始处理
     const handleCompositionStart = useCallback(() => {
         setIsComposing(true);
         compositionStartTime.current = Date.now();
         pendingChars.current = "";
         isEditorLocked.current = false;
         
-        // 保存当前输入值
+        // 保存当前光标位置的内容
         if (editorEl.current && editorEl.current.view) {
             const { state } = editorEl.current.view;
-            lastInputValue.current = state.doc.textContent;
+            const { from, to } = state.selection;
+            lastInputValue.current = state.doc.textBetween(from, to);
         }
     }, [editorEl]);
 
-    // 组合输入结束处理
+    // 修改组合输入结束处理
     const handleCompositionEnd = useCallback(() => {
         const now = Date.now();
         lastCompositionEndTime.current = now;
@@ -103,97 +122,77 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         let currentValue = "";
         if (editorEl.current && editorEl.current.view) {
             const { state } = editorEl.current.view;
-            currentValue = state.doc.textContent;
+            const { from, to } = state.selection;
+            currentValue = state.doc.textBetween(from, to);
         }
         
         // 检查是否有重复输入
         if (currentValue.includes(lastInputValue.current) && 
             currentValue.length > lastInputValue.current.length) {
-            // 如果检测到重复输入，回退到上一次的状态
+            // 如果检测到重复输入，只保留新输入的内容
             if (editorEl.current && editorEl.current.view) {
                 const { state } = editorEl.current.view;
+                const { from, to } = state.selection;
+                const newContent = currentValue.slice(lastInputValue.current.length);
                 editorEl.current.view.dispatch(
-                    state.tr.insertText(currentValue.replace(lastInputValue.current, ""))
+                    state.tr
+                        .delete(from, to)
+                        .insertText(newContent, from)
                 );
+                currentValue = newContent;
             }
         }
+        
+        // 更新最后一次输入值
+        lastInputValue.current = currentValue;
         
         // 处理待处理的特殊字符
         if (pendingChars.current) {
             handleMarkdownCommand(pendingChars.current);
             pendingChars.current = "";
         }
-        
-        // 更新最后一次输入值
-        lastInputValue.current = currentValue;
-        
-        // 确保编辑器状态正确
-        if (editorEl.current && editorEl.current.view) {
-            const { state } = editorEl.current.view;
-            editorEl.current.view.dispatch(state.tr);
-        }
     }, [editorEl, handleMarkdownCommand]);
 
-    // 键盘事件处理
+    // 修改键盘事件处理
     const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
         const specialChars = ['/', '#', '*', '>', '`', '-', '+', '=', '[', ']', '(', ')', '!', '@'];
-        
-        // 处理数字键选词
-        if (isComposing && e.key >= '1' && e.key <= '9') {
-            return; // 让输入法处理
-        }
-        
-        // 处理Enter键
-        if (e.key === 'Enter') {
-            if (isComposing) {
-                return; // 让输入法处理
-            }
-            return; // 让编辑器处理
-        }
         
         // 处理特殊字符
         if (specialChars.includes(e.key)) {
             if (isComposing) {
+                // 在中文输入法下，特殊处理斜杠
+                if (e.key === '/' && inputMethodState.current === 'chinese') {
+                    e.preventDefault();
+                    handleMarkdownCommand('/');
+                    return;
+                }
                 pendingChars.current = e.key;
-                return; // 让输入法处理
+                return;
             }
-            
-            // 非组合状态下直接处理
             e.preventDefault();
             handleMarkdownCommand(e.key);
         }
+        
+        // 处理数字选择
+        if (isComposing && /^[1-9]$/.test(e.key)) {
+            e.preventDefault();
+            // 让输入法处理数字选择
+            return;
+        }
     }, [isComposing, handleMarkdownCommand]);
 
-    // 编辑器变化处理
-    const handleEditorChange = useCallback(
-        (value: () => string) => {
-            if (isComposing) {
-                return; // 组合输入时不处理
-            }
-            
-            // 获取当前内容
-            const content = value();
-            
-            // 更新localStorage
-            if (note?.id) {
-                try {
-                    const notes = JSON.parse(localStorage.getItem('notes') || '{}');
-                    notes[note.id] = {
-                        ...note,
-                        content,
-                        updatedAt: new Date().toISOString()
-                    };
-                    localStorage.setItem('notes', JSON.stringify(notes));
-                } catch (err) {
-                    console.error('Failed to save to localStorage:', err);
-                }
-            }
-            
-            // 调用原始的onChange处理
-            onEditorChange(value);
-        },
-        [isComposing, onEditorChange, note]
-    );
+    // 修改编辑器变化处理
+    const handleEditorChange = useCallback(() => {
+        if (!editorEl.current || !editorEl.current.view) return;
+        
+        const { state } = editorEl.current.view;
+        const content = state.doc.textContent;
+        
+        // 只在非组合输入状态下更新localStorage
+        if (!isComposing) {
+            localStorage.setItem('editorContent', content);
+        }
+    }, [isComposing]);
 
     // 设置编辑器事件监听
     useEffect(() => {
