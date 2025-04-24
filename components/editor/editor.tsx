@@ -93,29 +93,6 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         }
     }, [isComposing, onEditorChange, note]);
 
-    // 修改Markdown命令处理
-    const handleMarkdownCommand = useCallback((command: string) => {
-        if (!editorEl.current || !editorEl.current.view) return;
-        
-        const { state } = editorEl.current.view;
-        const { from, to } = state.selection;
-        
-        // 处理所有命令
-        editorEl.current.view.dispatch(
-            state.tr
-                .delete(from, to)
-                .insertText(command, from)
-        );
-        
-        // 确保编辑器状态正确
-        requestAnimationFrame(() => {
-            if (editorEl.current && editorEl.current.view) {
-                const { state } = editorEl.current.view;
-                editorEl.current.view.dispatch(state.tr);
-            }
-        });
-    }, [editorEl]);
-
     // 修改组合输入开始处理
     const handleCompositionStart = useCallback(() => {
         setIsComposing(true);
