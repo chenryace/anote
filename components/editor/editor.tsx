@@ -102,7 +102,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         
         // 处理特殊命令
         if (command === '/') {
-            // 清除当前选区内容
+            // 清除当前选区内容并插入斜杠
             editorEl.current.view.dispatch(
                 state.tr
                     .delete(from, to)
@@ -210,16 +210,26 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         
         // 处理特殊字符
         if (specialChars.includes(e.key)) {
-            // 在中文输入法下，特殊处理斜杠和其他命令
-            if (inputMethodState.current === 'chinese') {
+            // 在中文输入法下，特殊处理斜杠
+            if (inputMethodState.current === 'chinese' && e.key === '/') {
                 e.preventDefault();
-                // 如果是斜杠，直接触发命令菜单
-                if (e.key === '/') {
-                    handleMarkdownCommand('/');
-                    return;
+                // 直接插入斜杠并触发命令菜单
+                if (editorEl.current && editorEl.current.view) {
+                    const { state } = editorEl.current.view;
+                    const { from, to } = state.selection;
+                    editorEl.current.view.dispatch(
+                        state.tr
+                            .delete(from, to)
+                            .insertText('/', from)
+                    );
+                    // 确保命令菜单显示
+                    requestAnimationFrame(() => {
+                        if (editorEl.current && editorEl.current.view) {
+                            const { state } = editorEl.current.view;
+                            editorEl.current.view.dispatch(state.tr);
+                        }
+                    });
                 }
-                // 其他命令等待组合输入结束
-                pendingChars.current = e.key;
                 return;
             }
             
@@ -238,7 +248,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             e.preventDefault();
             return;
         }
-    }, [isComposing, handleMarkdownCommand]);
+    }, [isComposing, handleMarkdownCommand, editorEl]);
 
     // 设置编辑器事件监听
     useEffect(() => {
