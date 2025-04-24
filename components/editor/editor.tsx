@@ -669,7 +669,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                     try {
                         // 创建并分发一个合成结束事件
                         setTimeout(() => {
-                            if (isComposing) {
+                            if (isComposing && editorEl.current && editorEl.current.element) {
                                 const compositionEndEvent = new Event('compositionend');
                                 editorEl.current.element.dispatchEvent(compositionEndEvent);
                                 console.log('斜杠命令：已主动触发compositionend事件');
