@@ -174,7 +174,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     }, [editorEl]);
 
     // 修改组合输入结束处理 - 使用DOM事件类型
-    const handleCompositionEnd = useCallback((e: Event) => {
+    const handleCompositionEnd = useCallback(_e: Event) => {
         console.log('组合输入结束');
         setIsComposing(false);
         isEditorLocked.current = false;
