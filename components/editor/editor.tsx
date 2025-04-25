@@ -174,7 +174,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     }, [editorEl]);
 
     // 修改组合输入结束处理
-    const handleCompositionEnd = useCallback((e: React.CompositionEvent<HTMLDivElement>) => {
+    const handleCompositionEnd = useCallback((_e: React.CompositionEvent<HTMLDivElement>) => {
         console.log('组合输入结束');
         setIsComposing(false);
         isEditorLocked.current = false;
