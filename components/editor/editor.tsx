@@ -89,9 +89,8 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     // 修改组合输入结束处理
     const handleCompositionEnd = useCallback(() => {
         setIsComposing(false);
-        isEditorLocked.current = false;  // 确保在组合输入结束后解锁编辑器
+        isEditorLocked.current = false;
         
-        // 获取当前输入值
         if (editorEl.current && editorEl.current.view) {
             const { state } = editorEl.current.view;
             const { from, to } = state.selection;
@@ -135,6 +134,43 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         if (isComposing && (e.key === 'Enter' || e.key === 'Shift' || /^[1-9]$/.test(e.key))) {
             composed();
             return; // 让编辑器处理这些按键
+        }
+
+        // 处理中文输入法下的 / 键
+        if (e.key === '/' && isComposing) {
+            // 获取当前行的内容
+            if (editorEl.current && editorEl.current.view) {
+                const { state } = editorEl.current.view;
+                const { from } = state.selection;
+                const line = state.doc.lineAt(from);
+                
+                // 如果光标在行首，或者当前行只有空格
+                if (from === line.from || line.text.trim() === '') {
+                    // 等待用户输入第二个 /
+                    setTimeout(() => {
+                        if (editorEl.current && editorEl.current.view) {
+                            const currentState = editorEl.current.view.state;
+                            const currentFrom = currentState.selection.from;
+                            const currentLine = currentState.doc.lineAt(currentFrom);
+                            
+                            // 检查是否输入了 、、
+                            if (currentLine.text.slice(currentFrom - line.from, currentFrom - line.from + 2) === '、、') {
+                                // 替换为 /
+                                editorEl.current.view.dispatch(
+                                    currentState.tr
+                                        .delete(currentFrom - 2, currentFrom)
+                                        .insertText('/', currentFrom - 2)
+                                );
+                                // 触发命令菜单
+                                editorEl.current.view.dispatch(
+                                    currentState.tr.setMeta('show-command-menu', true)
+                                );
+                            }
+                        }
+                    }, 100); // 给用户一点时间输入第二个 /
+                }
+            }
+            return;
         }
 
         // 如果编辑器被锁定，只处理数字键
