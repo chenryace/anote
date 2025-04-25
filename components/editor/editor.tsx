@@ -42,7 +42,6 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         isActive: false,           // 当前是否处于组合输入状态
         startTime: 0,              // 组合输入开始时间
         endTime: 0,                // 组合输入结束时间
-        pendingChars: '',          // 待处理的特殊字符
         lastSelection: { from: 0, to: 0 } // 上次选择范围
     });
 
@@ -83,43 +82,10 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         }, 10);
     }, [editorEl]);
 
-    // 处理待处理的特殊字符
-    const handlePendingSpecialChars = useCallback((chars: string) => {
-        if (!editorEl.current || !editorEl.current.view) return;
-        
-        console.log('处理待处理的特殊字符:', chars);
-        
-        // 处理斜杠命令
-        if (chars.includes('/')) {
-            handleSlashCommand();
-        }
-        
-        // 处理其他Markdown命令
-        if (chars.includes('#')) {
-            handleMarkdownCommand('#');
-        }
-        
-        if (chars.includes('*')) {
-            handleMarkdownCommand('*');
-        }
-        
-        // 处理其他特殊字符...
-    }, [editorEl, handleSlashCommand, handleMarkdownCommand]);
-
     // 修改组合输入更新事件处理 - 使用React事件类型
     const handleCompositionUpdate = useCallback((e: ReactCompositionEvent) => {
         // 记录组合输入过程中的状态
         compositionStateRef.current.isActive = true;
-        
-        // 检查是否包含特殊字符，但不立即处理
-        if (e.data) {
-            const specialChars = ['/', '#', '*', '>', '`', '-', '+', '=', '[', ']', '(', ')', '!', '@'];
-            for (const char of specialChars) {
-                if (e.data.includes(char)) {
-                    compositionStateRef.current.pendingChars += char;
-                }
-            }
-        }
     }, []);
 
     // 修改编辑器变化处理
@@ -160,7 +126,6 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         // 更新组合输入状态
         compositionStateRef.current.isActive = true;
         compositionStateRef.current.startTime = Date.now();
-        compositionStateRef.current.pendingChars = '';
         
         // 保存当前光标位置的内容
         if (editorEl.current && editorEl.current.view) {
@@ -200,22 +165,13 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             
             // 更新最后一次输入值
             lastInputValue.current = currentValue;
-            
-            // 处理待处理的特殊字符
-            if (compositionStateRef.current.pendingChars) {
-                // 延迟处理特殊字符，确保浏览器完成组合输入处理
-                setTimeout(() => {
-                    handlePendingSpecialChars(compositionStateRef.current.pendingChars);
-                    compositionStateRef.current.pendingChars = '';
-                }, 10);
-            }
         }
         
         // 延迟触发编辑器变化，确保浏览器完成组合输入处理
         setTimeout(() => {
             handleEditorChange();
         }, 10);
-    }, [editorEl, handleEditorChange, handlePendingSpecialChars]);
+    }, [editorEl, handleEditorChange]);
 
     // 添加 composed 函数
     const composed = useCallback(() => {
@@ -346,15 +302,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     // 添加输入事件处理函数
     const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
         console.log('输入事件', e.type);
-        
-        // 检查是否刚刚完成组合输入
-        const timeSinceCompositionEnd = Date.now() - compositionStateRef.current.endTime;
-        if (timeSinceCompositionEnd < 100 && compositionStateRef.current.pendingChars) {
-            // 处理特殊字符
-            handlePendingSpecialChars(compositionStateRef.current.pendingChars);
-            compositionStateRef.current.pendingChars = '';
-        }
-    }, [handlePendingSpecialChars]);
+    }, []);
 
     return (
         <>
