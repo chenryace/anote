@@ -149,27 +149,6 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         // 更新最后一次输入值
         lastInputValue.current = currentValue;
         
-        // 处理待处理的特殊字符
-        if (pendingChars.current) {
-            if (editorEl.current && editorEl.current.view) {
-                const { state } = editorEl.current.view;
-                const { from, to } = state.selection;
-                
-                // 插入命令字符
-                const tr = state.tr
-                    .delete(from, to)
-                    .insertText(pendingChars.current, from);
-                
-                // 如果是斜杠命令，设置一个标记
-                if (pendingChars.current === '/') {
-                    tr.setMeta('showCommandMenu', true);
-                }
-                
-                editorEl.current.view.dispatch(tr);
-            }
-            pendingChars.current = "";
-        }
-        
         // 触发编辑器变化
         handleEditorChange();
     }, [editorEl, handleEditorChange]);
@@ -183,37 +162,20 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             // 阻止默认行为
             e.preventDefault();
             
-            // 如果是组合输入状态，保存命令
-            if (isComposing) {
-                pendingChars.current = e.key;
-                return;
-            }
-            
             // 直接处理命令
             if (editorEl.current && editorEl.current.view) {
                 const { state } = editorEl.current.view;
                 const { from, to } = state.selection;
                 
                 // 插入命令字符
-                const tr = state.tr
-                    .delete(from, to)
-                    .insertText(e.key, from);
-                
-                // 如果是斜杠命令，设置一个标记
-                if (e.key === '/') {
-                    tr.setMeta('showCommandMenu', true);
-                }
-                
-                editorEl.current.view.dispatch(tr);
+                editorEl.current.view.dispatch(
+                    state.tr
+                        .delete(from, to)
+                        .insertText(e.key, from)
+                );
             }
         }
-        
-        // 处理数字选择
-        if (isComposing && /^[1-9]$/.test(e.key)) {
-            e.preventDefault();
-            return;
-        }
-    }, [isComposing, editorEl]);
+    }, [editorEl]);
 
     // 设置编辑器事件监听
     useEffect(() => {
