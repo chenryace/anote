@@ -136,40 +136,31 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             return; // 让编辑器处理这些按键
         }
 
-        // 处理中文输入法下的 / 键
-        if (e.key === '/' && isComposing) {
-            // 获取当前行的内容
+        // 处理 / 键
+        if (e.key === '/') {
+            // 如果在中文输入法状态下，让输入法处理
+            if (isComposing) {
+                return;
+            }
+            
+            // 在英文输入法状态下，触发命令菜单
             if (editorEl.current && editorEl.current.view) {
                 const { state } = editorEl.current.view;
-                const { from } = state.selection;
-                const line = state.doc.lineAt(from);
+                const { from, to } = state.selection;
                 
-                // 如果光标在行首，或者当前行只有空格
-                if (from === line.from || line.text.trim() === '') {
-                    // 等待用户输入第二个 /
-                    setTimeout(() => {
-                        if (editorEl.current && editorEl.current.view) {
-                            const currentState = editorEl.current.view.state;
-                            const currentFrom = currentState.selection.from;
-                            const currentLine = currentState.doc.lineAt(currentFrom);
-                            
-                            // 检查是否输入了 、、
-                            if (currentLine.text.slice(currentFrom - line.from, currentFrom - line.from + 2) === '、、') {
-                                // 替换为 /
-                                editorEl.current.view.dispatch(
-                                    currentState.tr
-                                        .delete(currentFrom - 2, currentFrom)
-                                        .insertText('/', currentFrom - 2)
-                                );
-                                // 触发命令菜单
-                                editorEl.current.view.dispatch(
-                                    currentState.tr.setMeta('show-command-menu', true)
-                                );
-                            }
-                        }
-                    }, 100); // 给用户一点时间输入第二个 /
-                }
+                // 插入 / 字符
+                editorEl.current.view.dispatch(
+                    state.tr
+                        .delete(from, to)
+                        .insertText('/', from)
+                );
+                
+                // 触发命令菜单
+                editorEl.current.view.dispatch(
+                    state.tr.setMeta('show-command-menu', true)
+                );
             }
+            e.preventDefault();
             return;
         }
 
@@ -187,8 +178,8 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             return;
         }
         
-        // 处理特殊字符
-        const specialChars = ['/', '#', '*', '>', '`', '-', '+', '=', '[', ']', '(', ')', '!', '@'];
+        // 处理其他特殊字符
+        const specialChars = ['#', '*', '>', '`', '-', '+', '=', '[', ']', '(', ')', '!', '@'];
         if (specialChars.includes(e.key)) {
             e.preventDefault();
             
