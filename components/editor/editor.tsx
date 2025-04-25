@@ -36,33 +36,13 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     
     // 状态管理
     const [isComposing, setIsComposing] = useState(false);
-    const compositionStartTime = useRef(0);
-    const lastCompositionEndTime = useRef(0);
-    const pendingChars = useRef("");
     const isEditorLocked = useRef(false);
     const lastInputValue = useRef("");
-    const inputMethodState = useRef<'chinese' | 'english'>('english');
 
     useEffect(() => {
         if (isPreview) return;
         setHasMinHeight((backlinks?.length ?? 0) <= 0);
     }, [backlinks, isPreview]);
-
-    // 添加输入法状态监听
-    useEffect(() => {
-        const handleInputMethodChange = (e: InputEvent) => {
-            inputMethodState.current = e.inputType === 'insertCompositionText' ? 'chinese' : 'english';
-        };
-
-        if (editorEl.current && editorEl.current.element) {
-            const editorDom = editorEl.current.element;
-            editorDom.addEventListener('inputmethodchange', handleInputMethodChange as EventListener);
-
-            return () => {
-                editorDom.removeEventListener('inputmethodchange', handleInputMethodChange as EventListener);
-            };
-        }
-    }, []);
 
     // 修改编辑器变化处理
     const handleEditorChange = useCallback(() => {
@@ -96,9 +76,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     // 修改组合输入开始处理
     const handleCompositionStart = useCallback(() => {
         setIsComposing(true);
-        compositionStartTime.current = Date.now();
-        pendingChars.current = "";
-        isEditorLocked.current = false;
+        isEditorLocked.current = true;
         
         // 保存当前光标位置的内容
         if (editorEl.current && editorEl.current.view) {
@@ -110,44 +88,30 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
 
     // 修改组合输入结束处理
     const handleCompositionEnd = useCallback(() => {
-        const now = Date.now();
-        lastCompositionEndTime.current = now;
-        
-        // 如果输入时间过短（<100ms），可能是误触，不处理
-        if (now - compositionStartTime.current < 100) {
-            return;
-        }
-        
         setIsComposing(false);
         isEditorLocked.current = false;
         
         // 获取当前输入值
-        let currentValue = "";
         if (editorEl.current && editorEl.current.view) {
             const { state } = editorEl.current.view;
             const { from, to } = state.selection;
-            currentValue = state.doc.textBetween(from, to);
-        }
-        
-        // 检查是否有重复输入
-        if (currentValue.includes(lastInputValue.current) && 
-            currentValue.length > lastInputValue.current.length) {
-            // 如果检测到重复输入，只保留新输入的内容
-            if (editorEl.current && editorEl.current.view) {
-                const { state } = editorEl.current.view;
-                const { from, to } = state.selection;
+            const currentValue = state.doc.textBetween(from, to);
+            
+            // 检查是否有重复输入
+            if (currentValue.includes(lastInputValue.current) && 
+                currentValue.length > lastInputValue.current.length) {
+                // 如果检测到重复输入，只保留新输入的内容
                 const newContent = currentValue.slice(lastInputValue.current.length);
                 editorEl.current.view.dispatch(
                     state.tr
                         .delete(from, to)
                         .insertText(newContent, from)
                 );
-                currentValue = newContent;
             }
+            
+            // 更新最后一次输入值
+            lastInputValue.current = currentValue;
         }
-        
-        // 更新最后一次输入值
-        lastInputValue.current = currentValue;
         
         // 触发编辑器变化
         handleEditorChange();
@@ -155,14 +119,20 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
 
     // 修改键盘事件处理
     const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
-        const specialChars = ['/', '#', '*', '>', '`', '-', '+', '=', '[', ']', '(', ')', '!', '@'];
+        // 如果编辑器被锁定，只处理 Enter 和数字键
+        if (isEditorLocked.current) {
+            if (e.key === 'Enter' || /^[1-9]$/.test(e.key)) {
+                return; // 让输入法处理
+            }
+            e.preventDefault();
+            return;
+        }
         
         // 处理特殊字符
+        const specialChars = ['/', '#', '*', '>', '`', '-', '+', '=', '[', ']', '(', ')', '!', '@'];
         if (specialChars.includes(e.key)) {
-            // 阻止默认行为
             e.preventDefault();
             
-            // 直接处理命令
             if (editorEl.current && editorEl.current.view) {
                 const { state } = editorEl.current.view;
                 const { from, to } = state.selection;
