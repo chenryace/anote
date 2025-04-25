@@ -1,6 +1,7 @@
 import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEvent, useRef, CompositionEvent } from 'react';
 import { use100vh } from 'react-div-100vh';
-import MarkdownEditor, { Props } from '@notea/rich-markdown-editor';
+import MarkdownEditorComponent, { Props } from '@notea/rich-markdown-editor';
+// 然后在 JSX 中使用 MarkdownEditorComponent
 import { useEditorTheme } from './theme';
 import useMounted from 'libs/web/hooks/use-mounted';
 import Tooltip from './tooltip';
@@ -387,7 +388,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                 onCompositionStart={handleReactCompositionStart}
                 onCompositionEnd={handleReactCompositionEnd}
             >
-                <MarkdownEditor
+                <MarkdownEditorComponent
                     readOnly={readOnly}
                     id={note?.id}
                     ref={editorEl}
