@@ -345,7 +345,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
 
     // 添加输入事件处理函数
     const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
-        console.log('输入事件');
+        console.log('输入事件', e.type);
         
         // 检查是否刚刚完成组合输入
         const timeSinceCompositionEnd = Date.now() - compositionStateRef.current.endTime;
