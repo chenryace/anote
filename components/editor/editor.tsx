@@ -204,6 +204,19 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             return;
         }
         
+        // 处理Markdown快捷键
+        if (!isComposing && e.ctrlKey) {
+            if (e.key === 'b') {
+                // 粗体
+                handleMarkdownCommand('bold');
+                return;
+            } else if (e.key === 'i') {
+                // 斜体
+                handleMarkdownCommand('italic');
+                return;
+            }
+        }
+        
         // 处理组合输入状态下的按键
         if (isComposing) {
             // 数字键1-9通常用于中文输入法选词
@@ -246,7 +259,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                 }
             }
         }
-    }, [editorEl, isComposing, composed]);
+    }, [editorEl, isComposing, composed, handleMarkdownCommand]);
 
     // 添加安全机制，防止编辑器永久锁定
     useEffect(() => {
