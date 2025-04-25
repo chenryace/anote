@@ -89,7 +89,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     // 修改组合输入结束处理
     const handleCompositionEnd = useCallback(() => {
         setIsComposing(false);
-        isEditorLocked.current = false;
+        isEditorLocked.current = false;  // 确保在组合输入结束后解锁编辑器
         
         // 获取当前输入值
         if (editorEl.current && editorEl.current.view) {
@@ -119,10 +119,24 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
 
     // 修改键盘事件处理
     const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
-        // 如果编辑器被锁定，只处理 Enter 和数字键
+        // 处理 Enter 键
+        if (e.key === 'Enter') {
+            // 如果编辑器被锁定，解锁它
+            if (isEditorLocked.current) {
+                isEditorLocked.current = false;
+                setIsComposing(false);
+            }
+            return; // 让编辑器处理换行
+        }
+
+        // 如果编辑器被锁定，只处理数字键
         if (isEditorLocked.current) {
-            if (e.key === 'Enter' || /^[1-9]$/.test(e.key)) {
-                return; // 让输入法处理
+            if (/^[1-9]$/.test(e.key)) {
+                return; // 让输入法处理数字选择
+            }
+            // 在组合输入期间，允许方向键和删除键
+            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Backspace', 'Delete'].includes(e.key)) {
+                return;
             }
             e.preventDefault();
             return;
