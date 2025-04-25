@@ -156,21 +156,16 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                 const { from, to } = state.selection;
                 
                 // 插入命令字符
-                editorEl.current.view.dispatch(
-                    state.tr
-                        .delete(from, to)
-                        .insertText(pendingChars.current, from)
-                );
+                const tr = state.tr
+                    .delete(from, to)
+                    .insertText(pendingChars.current, from);
                 
-                // 如果是斜杠命令，确保命令菜单显示
+                // 如果是斜杠命令，设置一个标记
                 if (pendingChars.current === '/') {
-                    requestAnimationFrame(() => {
-                        if (editorEl.current && editorEl.current.view) {
-                            const { state } = editorEl.current.view;
-                            editorEl.current.view.dispatch(state.tr);
-                        }
-                    });
+                    tr.setMeta('showCommandMenu', true);
                 }
+                
+                editorEl.current.view.dispatch(tr);
             }
             pendingChars.current = "";
         }
@@ -200,21 +195,16 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                 const { from, to } = state.selection;
                 
                 // 插入命令字符
-                editorEl.current.view.dispatch(
-                    state.tr
-                        .delete(from, to)
-                        .insertText(e.key, from)
-                );
+                const tr = state.tr
+                    .delete(from, to)
+                    .insertText(e.key, from);
                 
-                // 如果是斜杠命令，确保命令菜单显示
+                // 如果是斜杠命令，设置一个标记
                 if (e.key === '/') {
-                    requestAnimationFrame(() => {
-                        if (editorEl.current && editorEl.current.view) {
-                            const { state } = editorEl.current.view;
-                            editorEl.current.view.dispatch(state.tr);
-                        }
-                    });
+                    tr.setMeta('showCommandMenu', true);
                 }
+                
+                editorEl.current.view.dispatch(tr);
             }
         }
         
