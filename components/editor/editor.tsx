@@ -1,4 +1,4 @@
-import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEvent, useRef, CompositionEvent, CompositionEvent as ReactCompositionEvent } from 'react';
+import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEvent, useRef, CompositionEvent } from 'react';
 import { use100vh } from 'react-div-100vh';
 import MarkdownEditor, { Props } from '@notea/rich-markdown-editor';
 import { useEditorTheme } from './theme';
@@ -531,6 +531,5 @@ useEffect(() => {
     
     return () => clearInterval(safetyTimer);
 }, [isComposing]);
-};
 
 export default Editor;
