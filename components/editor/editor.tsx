@@ -172,12 +172,31 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
         console.log(`键盘事件: ${e.key}, 组合状态: ${isComposing}`);
         
+        // 处理 Enter 键 - 换行后重置编辑器状态
+        if (e.key === 'Enter' && !isComposing) {
+            // 允许默认行为执行
+            setTimeout(() => {
+                resetEditorState();
+            }, 10);
+        }
+        
+        // 处理 Shift 键 - 可能是切换输入法，重置编辑器状态
+        if (e.key === 'Shift') {
+            setTimeout(() => {
+                resetEditorState();
+            }, 10);
+            return; // 不阻止默认行为
+        }
+        
         // 处理 / 键 - 无论在什么状态下都应该触发命令菜单
         if (e.key === '/') {
             // 如果在组合输入状态，先结束组合输入
             if (isComposing) {
                 composed();
             }
+            
+            // 强制重置编辑器状态
+            resetEditorState();
             
             e.preventDefault();
             
@@ -259,7 +278,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                 }
             }
         }
-    }, [editorEl, isComposing, composed, handleMarkdownCommand]);
+    }, [editorEl, isComposing, composed, handleMarkdownCommand, resetEditorState]);
 
     // 添加安全机制，防止编辑器永久锁定
     useEffect(() => {
@@ -299,6 +318,39 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
         console.log('输入事件', e.type);
     }, []);
+
+    // 添加重置编辑器状态的函数
+    const resetEditorState = useCallback(() => {
+        console.log('重置编辑器状态');
+        setIsComposing(false);
+        isEditorLocked.current = false;
+        compositionStateRef.current.isActive = false;
+        
+        // 强制刷新编辑器视图
+        if (editorEl.current && editorEl.current.view) {
+            editorEl.current.view.dispatch(editorEl.current.view.state.tr);
+        }
+    }, [editorEl]);
+
+    // 添加全局键盘事件监听
+    useEffect(() => {
+        const handleGlobalKeyDown = (e: KeyboardEvent) => {
+            // 监听 Shift 键和 Enter 键
+            if (e.key === 'Shift' || (e.key === 'Enter' && !isComposing)) {
+                setTimeout(() => {
+                    resetEditorState();
+                }, 10);
+            }
+        };
+        
+        // 添加全局事件监听
+        document.addEventListener('keydown', handleGlobalKeyDown);
+        
+        return () => {
+            // 移除全局事件监听
+            document.removeEventListener('keydown', handleGlobalKeyDown);
+        };
+    }, [isComposing, resetEditorState]);
 
     return (
         <>
