@@ -78,6 +78,46 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         const { state } = editorEl.current.view;
         const content = state.doc.textContent;
         
+        // 检测是否出现了 、、 符号
+        if (content.includes('、、')) {
+            console.log('检测到 、、 符号，重置编辑器状态');
+            
+            // 强制结束组合输入
+            if (isComposing) {
+                composed();
+            }
+            
+            // 强制重置编辑器状态
+            resetEditorState();
+            
+            // 替换 、、 为 /
+            if (editorEl.current && editorEl.current.view) {
+                const { state } = editorEl.current.view;
+                const text = state.doc.textContent;
+                const pos = text.indexOf('、、');
+                
+                if (pos >= 0) {
+                    // 创建一个事务，删除 、、 并插入 /
+                    editorEl.current.view.dispatch(
+                        state.tr
+                            .delete(pos, pos + 2)  // 删除 、、 (两个字符)
+                            .insertText('/', pos)   // 插入 /
+                    );
+                    
+                    // 触发命令菜单
+                    setTimeout(() => {
+                        if (editorEl.current && editorEl.current.view) {
+                            editorEl.current.view.dispatch(
+                                editorEl.current.view.state.tr.setMeta('show-command-menu', true)
+                            );
+                        }
+                    }, 10);
+                }
+            }
+            
+            return; // 不继续处理
+        }
+        
         // 只在非组合输入状态下更新
         if (!isComposing) {
             // 更新localStorage
@@ -98,7 +138,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             // 调用原始的onChange处理
             onEditorChange(() => content);
         }
-    }, [isComposing, onEditorChange, note]);
+    }, [isComposing, onEditorChange, note, composed, resetEditorState]);
 
     // 修改组合输入开始处理 - 使用React事件类型
     const handleCompositionStart = useCallback((e: ReactCompositionEvent) => {
