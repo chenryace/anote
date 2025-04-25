@@ -50,23 +50,6 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         setHasMinHeight((backlinks?.length ?? 0) <= 0);
     }, [backlinks, isPreview]);
 
-    // 处理斜杠命令
-    const handleSlashCommand = useCallback(() => {
-        if (!editorEl.current || !editorEl.current.view) return;
-        
-        console.log('处理斜杠命令');
-        
-        // 延迟触发命令菜单，确保浏览器完成组合输入处理
-        setTimeout(() => {
-            if (editorEl.current && editorEl.current.view) {
-                // 触发命令菜单
-                editorEl.current.view.dispatch(
-                    editorEl.current.view.state.tr.setMeta('show-command-menu', true)
-                );
-            }
-        }, 10);
-    }, [editorEl]);
-
     // 处理Markdown命令
     const handleMarkdownCommand = useCallback((command: string) => {
         if (!editorEl.current || !editorEl.current.view) return;
