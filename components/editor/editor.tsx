@@ -154,7 +154,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     }, [isComposing, onEditorChange, note]);
 
     // 修改组合输入开始处理
-    const handleCompositionStart = useCallback((e: Event) => {
+    const handleCompositionStart = useCallback((_e: Event) => {
         console.log('组合输入开始');
         setIsComposing(true);
         isEditorLocked.current = true;
@@ -174,7 +174,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     }, [editorEl]);
 
     // 修改组合输入结束处理
-    const handleCompositionEnd = useCallback((e: Event) => {
+    const handleCompositionEnd = useCallback((_e: Event) => {
         console.log('组合输入结束');
         setIsComposing(false);
         isEditorLocked.current = false;
