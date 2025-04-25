@@ -71,6 +71,31 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         compositionStateRef.current.isActive = true;
     }, []);
 
+    // 添加 composed 函数 - 移到这里
+    const composed = useCallback(() => {
+        if (isComposing) {
+            setIsComposing(false);
+            isEditorLocked.current = false;
+            // 手动触发 compositionend 事件
+            if (editorEl.current && editorEl.current.element) {
+                editorEl.current.element.dispatchEvent(new Event('compositionend'));
+            }
+        }
+    }, [isComposing, editorEl]);
+
+    // 添加重置编辑器状态的函数 - 移到这里
+    const resetEditorState = useCallback(() => {
+        console.log('重置编辑器状态');
+        setIsComposing(false);
+        isEditorLocked.current = false;
+        compositionStateRef.current.isActive = false;
+        
+        // 强制刷新编辑器视图
+        if (editorEl.current && editorEl.current.view) {
+            editorEl.current.view.dispatch(editorEl.current.view.state.tr);
+        }
+    }, [editorEl]);
+
     // 修改编辑器变化处理
     const handleEditorChange = useCallback(() => {
         if (!editorEl.current || !editorEl.current.view) return;
@@ -196,70 +221,9 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         }, 10);
     }, [editorEl, handleEditorChange]);
 
-    // 添加 composed 函数
-    const composed = useCallback(() => {
-        if (isComposing) {
-            setIsComposing(false);
-            isEditorLocked.current = false;
-            // 手动触发 compositionend 事件
-            if (editorEl.current && editorEl.current.element) {
-                editorEl.current.element.dispatchEvent(new Event('compositionend'));
-            }
-        }
-    }, [isComposing, editorEl]);
+    // 删除这里的 composed 函数（已移到上面）
 
-
-    // 添加安全机制，防止编辑器永久锁定
-    useEffect(() => {
-        const safetyTimer = setInterval(() => {
-            // 如果编辑器锁定但不在组合输入状态，强制解锁
-            if (isEditorLocked.current && !isComposing) {
-                console.log('安全机制：强制解锁编辑器');
-                isEditorLocked.current = false;
-            }
-            
-            // 检查组合输入状态是否异常
-            const now = Date.now();
-            if (compositionStateRef.current.isActive && 
-                (now - compositionStateRef.current.startTime > 10000)) {
-                console.log('安全机制：检测到异常的组合输入状态，强制结束');
-                compositionStateRef.current.isActive = false;
-                setIsComposing(false);
-                isEditorLocked.current = false;
-            }
-        }, 5000); // 每5秒检查一次
-        
-        return () => clearInterval(safetyTimer);
-    }, [isComposing]);
-
-    // 设置编辑器事件监听 - 移除DOM事件监听，改用React事件系统
-    useEffect(() => {
-        if (!editorEl.current || isPreview || readOnly) return;
-        
-        // 不再需要手动添加DOM事件监听器，使用React事件系统
-        
-        return () => {
-            // 清理代码保留为空函数
-        };
-    }, [editorEl, isPreview, readOnly]);
-
-    // 添加输入事件处理函数
-    const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
-        console.log('输入事件', e.type);
-    }, []);
-
-    // 添加重置编辑器状态的函数 - 移到 handleKeyDown 之前
-    const resetEditorState = useCallback(() => {
-        console.log('重置编辑器状态');
-        setIsComposing(false);
-        isEditorLocked.current = false;
-        compositionStateRef.current.isActive = false;
-        
-        // 强制刷新编辑器视图
-        if (editorEl.current && editorEl.current.view) {
-            editorEl.current.view.dispatch(editorEl.current.view.state.tr);
-        }
-    }, [editorEl]);
+    // 删除这里的 resetEditorState 函数（已移到上面）
 
     // 添加键盘事件处理函数
     const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
