@@ -153,8 +153,8 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         }
     }, [isComposing, onEditorChange, note]);
 
-    // 修改组合输入开始处理
-    const handleCompositionStart = useCallback((_e: React.CompositionEvent<HTMLDivElement>) => {
+    // 修改组合输入开始处理 - 使用DOM事件类型
+    const handleCompositionStart = useCallback((e: Event) => {
         console.log('组合输入开始');
         setIsComposing(true);
         isEditorLocked.current = true;
@@ -173,8 +173,8 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         }
     }, [editorEl]);
 
-    // 修改组合输入结束处理
-    const handleCompositionEnd = useCallback((_e: React.CompositionEvent<HTMLDivElement>) => {
+    // 修改组合输入结束处理 - 使用DOM事件类型
+    const handleCompositionEnd = useCallback((e: Event) => {
         console.log('组合输入结束');
         setIsComposing(false);
         isEditorLocked.current = false;
@@ -369,12 +369,23 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         };
     }, [editorEl, isPreview, readOnly, handleCompositionStart, handleCompositionUpdate, handleCompositionEnd, handlePendingSpecialChars]);
 
+    // React事件处理函数 - 用于JSX元素
+    const handleReactCompositionStart = useCallback((e: React.CompositionEvent<HTMLDivElement>) => {
+        // 调用DOM事件处理函数
+        handleCompositionStart(e.nativeEvent);
+    }, [handleCompositionStart]);
+
+    const handleReactCompositionEnd = useCallback((e: React.CompositionEvent<HTMLDivElement>) => {
+        // 调用DOM事件处理函数
+        handleCompositionEnd(e.nativeEvent);
+    }, [handleCompositionEnd]);
+
     return (
         <>
             <div 
                 onKeyDown={handleKeyDown}
-                onCompositionStart={handleCompositionStart}
-                onCompositionEnd={handleCompositionEnd}
+                onCompositionStart={handleReactCompositionStart}
+                onCompositionEnd={handleReactCompositionEnd}
             >
                 <MarkdownEditor
                     readOnly={readOnly}
