@@ -66,7 +66,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     }, [editorEl]);
 
     // 修改组合输入更新事件处理 - 使用React事件类型
-    const handleCompositionUpdate = useCallback((e: ReactCompositionEvent) => {
+    const handleCompositionUpdate = useCallback((_e: ReactCompositionEvent) => {
         // 记录组合输入过程中的状态
         compositionStateRef.current.isActive = true;
     }, []);
