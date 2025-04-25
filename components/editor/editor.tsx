@@ -94,7 +94,7 @@ import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEve
                      console.error('Failed to save to localStorage:', err);
                  }
              }
- 
+             
              // 调用原始的onChange处理
              onEditorChange(() => content);
          }
@@ -207,6 +207,104 @@ import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEve
      const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
          console.log('输入事件', e.type);
      }, []);
+ 
+     // 添加 MutationObserver 监听 、、 符号
+     useEffect(() => {
+         if (!editorEl.current || !editorEl.current.element || isPreview || readOnly) return;
+         
+         // 创建 MutationObserver 实例
+         const observer = new MutationObserver((mutations) => {
+             // 检查文本变化
+             for (const mutation of mutations) {
+                 if (mutation.type === 'characterData' || mutation.type === 'childList') {
+                     // 获取编辑器内容
+                     const content = editorEl.current?.view?.state.doc.textContent || '';
+                     
+                     // 检测是否出现了 、、 符号
+                     if (content.includes('、、')) {
+                         console.log('MutationObserver: 检测到 、、 符号，重置编辑器状态');
+                         
+                         // 强制结束组合输入
+                         if (isComposing) {
+                             composed();
+                         }
+                         
+                         // 强制重置编辑器状态
+                         resetEditorState();
+                         
+                         // 替换 、、 为 /
+                         if (editorEl.current && editorEl.current.view) {
+                             const { state } = editorEl.current.view;
+                             const text = state.doc.textContent;
+                             const pos = text.indexOf('、、');
+                             
+                             if (pos >= 0) {
+                                 // 创建一个事务，删除 、、 并插入 /
+                                 editorEl.current.view.dispatch(
+                                     state.tr
+                                         .delete(pos, pos + 2)  // 删除 、、 (两个字符)
+                                         .insertText('/', pos)   // 插入 /
+                                 );
+                                 
+                                 // 触发命令菜单
+                                 setTimeout(() => {
+                                     if (editorEl.current && editorEl.current.view) {
+                                         editorEl.current.view.dispatch(
+                                             editorEl.current.view.state.tr.setMeta('show-command-menu', true)
+                                         );
+                                     }
+                                 }, 10);
+                             }
+                         }
+                     }
+                 }
+             }
+         });
+         
+         // 配置 observer
+         const config = {
+             characterData: true,
+             childList: true,
+             subtree: true
+         };
+         
+         // 开始观察
+         observer.observe(editorEl.current.element, config);
+         
+         // 清理函数
+         return () => {
+             observer.disconnect();
+         };
+     }, [editorEl, isPreview, readOnly, isComposing, composed, resetEditorState]);
+ 
+     // 修改编辑器变化处理 - 移除 、、 检测逻辑
+     const handleEditorChange = useCallback(() => {
+         if (!editorEl.current || !editorEl.current.view) return;
+         
+         const { state } = editorEl.current.view;
+         const content = state.doc.textContent;
+         
+         // 只在非组合输入状态下更新
+         if (!isComposing) {
+             // 更新localStorage
+             if (note?.id) {
+                 try {
+                     const notes = JSON.parse(localStorage.getItem('notes') || '{}');
+                     notes[note.id] = {
+                         ...note,
+                         content,
+                         updatedAt: new Date().toISOString()
+                     };
+                     localStorage.setItem('notes', JSON.stringify(notes));
+                 } catch (err) {
+                     console.error('Failed to save to localStorage:', err);
+                 }
+             }
+             
+             // 调用原始的onChange处理
+             onEditorChange(() => content);
+         }
+     }, [isComposing, onEditorChange, note]);
  
      // 添加重置编辑器状态的函数 - 移到 handleKeyDown 之前
      const resetEditorState = useCallback(() => {
