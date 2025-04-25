@@ -113,7 +113,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         
         // 检查是否包含特殊字符，但不立即处理
         // 注意：由于类型问题，我们需要将 e 转换为 CompositionEvent
-        const compositionEvent = e as CompositionEvent;
+        const compositionEvent = e as unknown as CompositionEvent;
         if (compositionEvent.data) {
             const specialChars = ['/', '#', '*', '>', '`', '-', '+', '=', '[', ']', '(', ')', '!', '@'];
             for (const char of specialChars) {
