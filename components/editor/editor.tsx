@@ -1,7 +1,6 @@
-import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEvent, useRef, CompositionEvent } from 'react';
+import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEvent, useRef, CompositionEvent as ReactCompositionEvent } from 'react';
 import { use100vh } from 'react-div-100vh';
 import MarkdownEditor, { Props } from '@notea/rich-markdown-editor';
-// 然后在 JSX 中使用 MarkdownEditorComponent
 import { useEditorTheme } from './theme';
 import useMounted from 'libs/web/hooks/use-mounted';
 import Tooltip from './tooltip';
@@ -107,18 +106,16 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         // 处理其他特殊字符...
     }, [editorEl, handleSlashCommand, handleMarkdownCommand]);
 
-    // 添加组合输入更新事件处理 - 修改参数类型为 Event
-    const handleCompositionUpdate = useCallback((e: Event) => {
+    // 修改组合输入更新事件处理 - 使用React事件类型
+    const handleCompositionUpdate = useCallback((e: ReactCompositionEvent) => {
         // 记录组合输入过程中的状态
         compositionStateRef.current.isActive = true;
         
         // 检查是否包含特殊字符，但不立即处理
-        // 注意：由于类型问题，我们需要将 e 转换为 CompositionEvent
-        const compositionEvent = e as unknown as CompositionEvent;
-        if (compositionEvent.data) {
+        if (e.data) {
             const specialChars = ['/', '#', '*', '>', '`', '-', '+', '=', '[', ']', '(', ')', '!', '@'];
             for (const char of specialChars) {
-                if (compositionEvent.data.includes(char)) {
+                if (e.data.includes(char)) {
                     compositionStateRef.current.pendingChars += char;
                 }
             }
@@ -154,8 +151,8 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         }
     }, [isComposing, onEditorChange, note]);
 
-    // 修改组合输入开始处理 - 使用DOM事件类型
-    const handleCompositionStart = useCallback((_e: Event) => {
+    // 修改组合输入开始处理 - 使用React事件类型
+    const handleCompositionStart = useCallback((e: ReactCompositionEvent) => {
         console.log('组合输入开始');
         setIsComposing(true);
         isEditorLocked.current = true;
@@ -174,8 +171,8 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         }
     }, [editorEl]);
 
-    // 修改组合输入结束处理 - 使用DOM事件类型
-    const handleCompositionEnd = useCallback(_e: Event) => {
+    // 修改组合输入结束处理 - 使用React事件类型
+    const handleCompositionEnd = useCallback((e: ReactCompositionEvent) => {
         console.log('组合输入结束');
         setIsComposing(false);
         isEditorLocked.current = false;
@@ -335,58 +332,38 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         return () => clearInterval(safetyTimer);
     }, [isComposing]);
 
-    // 设置编辑器事件监听
+    // 设置编辑器事件监听 - 移除DOM事件监听，改用React事件系统
     useEffect(() => {
         if (!editorEl.current || isPreview || readOnly) return;
-    
-        const editorDom = editorEl.current.element;
-        if (!editorDom) return;
-    
-        // 添加事件监听
-        editorDom.addEventListener('compositionstart', handleCompositionStart);
-        editorDom.addEventListener('compositionupdate', handleCompositionUpdate);
-        editorDom.addEventListener('compositionend', handleCompositionEnd);
         
-        // 添加输入事件监听
-        const handleInput = (e: Event) => {
-            console.log('输入事件', e);
-            
-            // 检查是否刚刚完成组合输入
-            const timeSinceCompositionEnd = Date.now() - compositionStateRef.current.endTime;
-            if (timeSinceCompositionEnd < 100 && compositionStateRef.current.pendingChars) {
-                // 处理特殊字符
-                handlePendingSpecialChars(compositionStateRef.current.pendingChars);
-                compositionStateRef.current.pendingChars = '';
-            }
-        };
+        // 不再需要手动添加DOM事件监听器，使用React事件系统
         
-        editorDom.addEventListener('input', handleInput);
-    
         return () => {
-            editorDom.removeEventListener('compositionstart', handleCompositionStart);
-            editorDom.removeEventListener('compositionupdate', handleCompositionUpdate);
-            editorDom.removeEventListener('compositionend', handleCompositionEnd);
-            editorDom.removeEventListener('input', handleInput);
+            // 清理代码保留为空函数
         };
-    }, [editorEl, isPreview, readOnly, handleCompositionStart, handleCompositionUpdate, handleCompositionEnd, handlePendingSpecialChars]);
+    }, [editorEl, isPreview, readOnly]);
 
-    // React事件处理函数 - 用于JSX元素
-    const handleReactCompositionStart = useCallback((e: React.CompositionEvent<HTMLDivElement>) => {
-        // 调用DOM事件处理函数
-        handleCompositionStart(e.nativeEvent);
-    }, [handleCompositionStart]);
-
-    const handleReactCompositionEnd = useCallback((e: React.CompositionEvent<HTMLDivElement>) => {
-        // 调用DOM事件处理函数
-        handleCompositionEnd(e.nativeEvent);
-    }, [handleCompositionEnd]);
+    // 添加输入事件处理函数
+    const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
+        console.log('输入事件');
+        
+        // 检查是否刚刚完成组合输入
+        const timeSinceCompositionEnd = Date.now() - compositionStateRef.current.endTime;
+        if (timeSinceCompositionEnd < 100 && compositionStateRef.current.pendingChars) {
+            // 处理特殊字符
+            handlePendingSpecialChars(compositionStateRef.current.pendingChars);
+            compositionStateRef.current.pendingChars = '';
+        }
+    }, [handlePendingSpecialChars]);
 
     return (
         <>
             <div 
                 onKeyDown={handleKeyDown}
-                onCompositionStart={handleReactCompositionStart}
-                onCompositionEnd={handleReactCompositionEnd}
+                onCompositionStart={handleCompositionStart}
+                onCompositionUpdate={handleCompositionUpdate}
+                onCompositionEnd={handleCompositionEnd}
+                onInput={handleInput}
             >
                 <MarkdownEditor
                     readOnly={readOnly}
