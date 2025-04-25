@@ -117,22 +117,31 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         handleEditorChange();
     }, [editorEl, handleEditorChange]);
 
+    // 添加 composed 函数
+    const composed = useCallback(() => {
+        if (isComposing) {
+            setIsComposing(false);
+            isEditorLocked.current = false;
+            // 手动触发 compositionend 事件
+            if (editorEl.current && editorEl.current.element) {
+                editorEl.current.element.dispatchEvent(new Event('compositionend'));
+            }
+        }
+    }, [isComposing, editorEl]);
+
     // 修改键盘事件处理
     const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
-        // 处理 Enter 键
-        if (e.key === 'Enter') {
-            // 如果编辑器被锁定，解锁它
-            if (isEditorLocked.current) {
-                isEditorLocked.current = false;
-                setIsComposing(false);
-            }
-            return; // 让编辑器处理换行
+        // 处理可能结束组合输入的按键
+        if (isComposing && (e.key === 'Enter' || e.key === 'Shift' || /^[1-9]$/.test(e.key))) {
+            composed();
+            return; // 让编辑器处理这些按键
         }
 
         // 如果编辑器被锁定，只处理数字键
         if (isEditorLocked.current) {
             if (/^[1-9]$/.test(e.key)) {
-                return; // 让输入法处理数字选择
+                composed(); // 数字键也会结束组合输入
+                return;
             }
             // 在组合输入期间，允许方向键和删除键
             if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Backspace', 'Delete'].includes(e.key)) {
@@ -159,7 +168,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                 );
             }
         }
-    }, [editorEl]);
+    }, [editorEl, isComposing, composed]);
 
     // 设置编辑器事件监听
     useEffect(() => {
