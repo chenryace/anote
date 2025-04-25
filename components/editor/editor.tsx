@@ -51,6 +51,79 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         setHasMinHeight((backlinks?.length ?? 0) <= 0);
     }, [backlinks, isPreview]);
 
+    // 处理斜杠命令
+    const handleSlashCommand = useCallback(() => {
+        if (!editorEl.current || !editorEl.current.view) return;
+        
+        console.log('处理斜杠命令');
+        
+        // 延迟触发命令菜单，确保浏览器完成组合输入处理
+        setTimeout(() => {
+            if (editorEl.current && editorEl.current.view) {
+                // 触发命令菜单
+                editorEl.current.view.dispatch(
+                    editorEl.current.view.state.tr.setMeta('show-command-menu', true)
+                );
+            }
+        }, 10);
+    }, [editorEl]);
+
+    // 处理Markdown命令
+    const handleMarkdownCommand = useCallback((command: string) => {
+        if (!editorEl.current || !editorEl.current.view) return;
+        
+        console.log(`处理Markdown命令: ${command}`);
+        
+        // 延迟处理，确保浏览器完成组合输入处理
+        setTimeout(() => {
+            if (editorEl.current && editorEl.current.view) {
+                // 刷新视图，确保格式化正确应用
+                editorEl.current.view.dispatch(editorEl.current.view.state.tr);
+            }
+        }, 10);
+    }, [editorEl]);
+
+    // 处理待处理的特殊字符
+    const handlePendingSpecialChars = useCallback((chars: string) => {
+        if (!editorEl.current || !editorEl.current.view) return;
+        
+        console.log('处理待处理的特殊字符:', chars);
+        
+        // 处理斜杠命令
+        if (chars.includes('/')) {
+            handleSlashCommand();
+        }
+        
+        // 处理其他Markdown命令
+        if (chars.includes('#')) {
+            handleMarkdownCommand('#');
+        }
+        
+        if (chars.includes('*')) {
+            handleMarkdownCommand('*');
+        }
+        
+        // 处理其他特殊字符...
+    }, [editorEl, handleSlashCommand, handleMarkdownCommand]);
+
+    // 添加组合输入更新事件处理 - 修改参数类型为 Event
+    const handleCompositionUpdate = useCallback((e: Event) => {
+        // 记录组合输入过程中的状态
+        compositionStateRef.current.isActive = true;
+        
+        // 检查是否包含特殊字符，但不立即处理
+        // 注意：由于类型问题，我们需要将 e 转换为 CompositionEvent
+        const compositionEvent = e as CompositionEvent;
+        if (compositionEvent.data) {
+            const specialChars = ['/', '#', '*', '>', '`', '-', '+', '=', '[', ']', '(', ')', '!', '@'];
+            for (const char of specialChars) {
+                if (compositionEvent.data.includes(char)) {
+                    compositionStateRef.current.pendingChars += char;
+                }
+            }
+        }
+    }, []);
+
     // 修改编辑器变化处理
     const handleEditorChange = useCallback(() => {
         if (!editorEl.current || !editorEl.current.view) return;
@@ -81,7 +154,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     }, [isComposing, onEditorChange, note]);
 
     // 修改组合输入开始处理
-    const handleCompositionStart = useCallback(() => {
+    const handleCompositionStart = useCallback((e: Event) => {
         console.log('组合输入开始');
         setIsComposing(true);
         isEditorLocked.current = true;
@@ -101,7 +174,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     }, [editorEl]);
 
     // 修改组合输入结束处理
-    const handleCompositionEnd = useCallback(() => {
+    const handleCompositionEnd = useCallback((e: Event) => {
         console.log('组合输入结束');
         setIsComposing(false);
         isEditorLocked.current = false;
@@ -144,7 +217,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         setTimeout(() => {
             handleEditorChange();
         }, 10);
-    }, [editorEl, handleEditorChange]);
+    }, [editorEl, handleEditorChange, handlePendingSpecialChars]);
 
     // 添加 composed 函数
     const composed = useCallback(() => {
@@ -164,11 +237,11 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         
         // 处理 / 键 - 无论在什么状态下都应该触发命令菜单
         if (e.key === '/') {
-        // 如果在组合输入状态，先结束组合输入
-        if (isComposing) {
-            composed();
-        }
-        
+            // 如果在组合输入状态，先结束组合输入
+            if (isComposing) {
+                composed();
+            }
+            
             e.preventDefault();
             
             if (editorEl.current && editorEl.current.view) {
@@ -237,6 +310,29 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             }
         }
     }, [editorEl, isComposing, composed]);
+
+    // 添加安全机制，防止编辑器永久锁定
+    useEffect(() => {
+        const safetyTimer = setInterval(() => {
+            // 如果编辑器锁定但不在组合输入状态，强制解锁
+            if (isEditorLocked.current && !isComposing) {
+                console.log('安全机制：强制解锁编辑器');
+                isEditorLocked.current = false;
+            }
+            
+            // 检查组合输入状态是否异常
+            const now = Date.now();
+            if (compositionStateRef.current.isActive && 
+                (now - compositionStateRef.current.startTime > 10000)) {
+                console.log('安全机制：检测到异常的组合输入状态，强制结束');
+                compositionStateRef.current.isActive = false;
+                setIsComposing(false);
+                isEditorLocked.current = false;
+            }
+        }, 5000); // 每5秒检查一次
+        
+        return () => clearInterval(safetyTimer);
+    }, [isComposing]);
 
     // 设置编辑器事件监听
     useEffect(() => {
