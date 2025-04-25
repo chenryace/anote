@@ -173,7 +173,7 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
 
     // 修改组合输入结束处理 - 使用React事件类型
     const handleCompositionEnd = useCallback((e: ReactCompositionEvent) => {
-        console.log('组合输入结束');
+        console.log('组合输入结束', e.type);
         setIsComposing(false);
         isEditorLocked.current = false;
         
