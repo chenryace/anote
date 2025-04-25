@@ -221,6 +221,117 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         }
     }, [editorEl]);
 
+    // 添加键盘事件处理函数
+    const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
+        console.log(`键盘事件: ${e.key}, 组合状态: ${isComposing}`);
+        
+        // 处理 Enter 键 - 换行后重置编辑器状态
+        if (e.key === 'Enter' && !isComposing) {
+            // 允许默认行为执行
+            setTimeout(() => {
+                resetEditorState();
+            }, 10);
+        }
+        
+        // 处理 Shift 键 - 可能是切换输入法，重置编辑器状态
+        if (e.key === 'Shift') {
+            setTimeout(() => {
+                resetEditorState();
+            }, 10);
+            return; // 不阻止默认行为
+        }
+        
+        // 处理 / 键 - 无论在什么状态下都应该触发命令菜单
+        if (e.key === '/') {
+            // 如果在组合输入状态，先结束组合输入
+            if (isComposing) {
+                composed();
+            }
+            
+            // 强制重置编辑器状态
+            resetEditorState();
+            
+            e.preventDefault();
+            
+            if (editorEl.current && editorEl.current.view) {
+                const { state } = editorEl.current.view;
+                const { from, to } = state.selection;
+                
+                // 插入 / 字符
+                editorEl.current.view.dispatch(
+                    state.tr
+                        .delete(from, to)
+                        .insertText('/', from)
+                );
+                
+                // 触发命令菜单
+                setTimeout(() => {
+                    if (editorEl.current && editorEl.current.view) {
+                        editorEl.current.view.dispatch(
+                            editorEl.current.view.state.tr.setMeta('show-command-menu', true)
+                        );
+                    }
+                }, 10);
+            }
+            return;
+        }
+        
+        // 处理Markdown快捷键
+        if (!isComposing && e.ctrlKey) {
+            if (e.key === 'b') {
+                // 粗体
+                handleMarkdownCommand('bold');
+                return;
+            } else if (e.key === 'i') {
+                // 斜体
+                handleMarkdownCommand('italic');
+                return;
+            }
+        }
+        
+        // 处理组合输入状态下的按键
+        if (isComposing) {
+            // 数字键1-9通常用于中文输入法选词
+            if (/^[1-9]$/.test(e.key)) {
+                return; // 不阻止默认行为，让输入法处理选词
+            }
+            
+            // Enter键通常用于确认选词
+            if (e.key === 'Enter') {
+                return; // 不阻止默认行为，让输入法处理选词
+            }
+            
+            // Shift键可能用于切换输入法
+            if (e.key === 'Shift') {
+                return; // 不阻止默认行为
+            }
+            
+            // 方向键和删除键应该正常工作
+            if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Backspace', 'Delete'].includes(e.key)) {
+                return; // 不阻止默认行为
+            }
+        } else {
+            // 非组合输入状态下的处理
+            
+            // 处理其他特殊字符
+            const specialChars = ['#', '*', '>', '`', '-', '+', '=', '[', ']', '(', ')', '!', '@'];
+            if (specialChars.includes(e.key)) {
+                e.preventDefault();
+                
+                if (editorEl.current && editorEl.current.view) {
+                    const { state } = editorEl.current.view;
+                    const { from, to } = state.selection;
+                    
+                    // 插入命令字符
+                    editorEl.current.view.dispatch(
+                        state.tr
+                            .delete(from, to)
+                            .insertText(e.key, from)
+                    );
+                }
+            }
+        }
+    }, [editorEl, isComposing, composed, handleMarkdownCommand, resetEditorState]);
 
     // 添加全局键盘事件监听
     useEffect(() => {
