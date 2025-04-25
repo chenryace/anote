@@ -357,6 +357,14 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         };
     }, [isComposing, resetEditorState]);
 
+    // Add the missing handleInput function
+    const handleInput = useCallback(() => {
+        // Only process input when not in composition mode
+        if (!isComposing) {
+            handleEditorChange();
+        }
+    }, [isComposing, handleEditorChange]);
+
     return (
         <>
             <div 
