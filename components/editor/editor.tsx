@@ -277,34 +277,8 @@ import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEve
          };
      }, [editorEl, isPreview, readOnly, isComposing, composed, resetEditorState]);
  
-     // 修改编辑器变化处理 - 移除 、、 检测逻辑
-     const handleEditorChange = useCallback(() => {
-         if (!editorEl.current || !editorEl.current.view) return;
-         
-         const { state } = editorEl.current.view;
-         const content = state.doc.textContent;
-         
-         // 只在非组合输入状态下更新
-         if (!isComposing) {
-             // 更新localStorage
-             if (note?.id) {
-                 try {
-                     const notes = JSON.parse(localStorage.getItem('notes') || '{}');
-                     notes[note.id] = {
-                         ...note,
-                         content,
-                         updatedAt: new Date().toISOString()
-                     };
-                     localStorage.setItem('notes', JSON.stringify(notes));
-                 } catch (err) {
-                     console.error('Failed to save to localStorage:', err);
-                 }
-             }
-             
-             // 调用原始的onChange处理
-             onEditorChange(() => content);
-         }
-     }, [isComposing, onEditorChange, note]);
+     // 删除这里的第二个 handleEditorChange 函数声明
+     // 不要重复声明 handleEditorChange
  
      // 添加重置编辑器状态的函数 - 移到 handleKeyDown 之前
      const resetEditorState = useCallback(() => {
