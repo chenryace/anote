@@ -208,6 +208,19 @@ import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEve
          console.log('输入事件', e.type);
      }, []);
  
+     // 添加重置编辑器状态的函数 - 移到 MutationObserver 之前
+     const resetEditorState = useCallback(() => {
+         console.log('重置编辑器状态');
+         setIsComposing(false);
+         isEditorLocked.current = false;
+         compositionStateRef.current.isActive = false;
+ 
+         // 强制刷新编辑器视图
+         if (editorEl.current && editorEl.current.view) {
+             editorEl.current.view.dispatch(editorEl.current.view.state.tr);
+         }
+     }, [editorEl]);
+ 
      // 添加 MutationObserver 监听 、、 符号
      useEffect(() => {
          if (!editorEl.current || !editorEl.current.element || isPreview || readOnly) return;
@@ -280,18 +293,7 @@ import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEve
      // 删除这里的第二个 handleEditorChange 函数声明
      // 不要重复声明 handleEditorChange
  
-     // 添加重置编辑器状态的函数 - 移到 handleKeyDown 之前
-     const resetEditorState = useCallback(() => {
-         console.log('重置编辑器状态');
-         setIsComposing(false);
-         isEditorLocked.current = false;
-         compositionStateRef.current.isActive = false;
- 
-         // 强制刷新编辑器视图
-         if (editorEl.current && editorEl.current.view) {
-             editorEl.current.view.dispatch(editorEl.current.view.state.tr);
-         }
-     }, [editorEl]);
+     // 删除这里的 resetEditorState 函数定义，因为已经移到前面了
  
      // 添加键盘事件处理函数
      const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
