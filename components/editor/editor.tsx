@@ -94,7 +94,7 @@ import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEve
                      console.error('Failed to save to localStorage:', err);
                  }
              }
-             
+ 
              // 调用原始的onChange处理
              onEditorChange(() => content);
          }
@@ -208,7 +208,7 @@ import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEve
          console.log('输入事件', e.type);
      }, []);
  
-     // 添加重置编辑器状态的函数
+     // 添加重置编辑器状态的函数 - 移到 handleKeyDown 之前
      const resetEditorState = useCallback(() => {
          console.log('重置编辑器状态');
          setIsComposing(false);
@@ -221,32 +221,24 @@ import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEve
          }
      }, [editorEl]);
  
-     // 删除MutationObserver相关代码，改为增强键盘事件处理
-     
-     // 添加键盘事件处理函数 - 增强版
+     // 添加键盘事件处理函数
      const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
          console.log(`键盘事件: ${e.key}, 组合状态: ${isComposing}`);
          
-         // 重置触发键列表：Enter, Shift, 数字键1-9, Delete, Backspace
-         const resetTriggerKeys = ['Enter', 'Shift', 'Delete', 'Backspace', 
-             '1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
-             
-         // 如果按下了重置触发键，立即重置编辑器状态
-         if (resetTriggerKeys.includes(e.key)) {
-             console.log(`检测到重置触发键: ${e.key}`);
-             
-             // 如果在组合输入状态，先结束组合输入
-             if (isComposing) {
-                 composed();
-             }
-             
-             // 延迟重置编辑器状态，确保浏览器完成默认行为
+         // 处理 Enter 键 - 换行后重置编辑器状态
+         if (e.key === 'Enter' && !isComposing) {
+             // 允许默认行为执行
              setTimeout(() => {
                  resetEditorState();
              }, 10);
-             
-             // 不阻止默认行为，让按键正常工作
-             return;
+         }
+         
+         // 处理 Shift 键 - 可能是切换输入法，重置编辑器状态
+         if (e.key === 'Shift') {
+             setTimeout(() => {
+                 resetEditorState();
+             }, 10);
+             return; // 不阻止默认行为
          }
          
          // 处理 / 键 - 无论在什么状态下都应该触发命令菜单
@@ -297,8 +289,30 @@ import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEve
              }
          }
          
-         // 非组合输入状态下的处理
-         if (!isComposing) {
+         // 处理组合输入状态下的按键
+         if (isComposing) {
+             // 数字键1-9通常用于中文输入法选词
+             if (/^[1-9]$/.test(e.key)) {
+                 return; // 不阻止默认行为，让输入法处理选词
+             }
+             
+             // Enter键通常用于确认选词
+             if (e.key === 'Enter') {
+                 return; // 不阻止默认行为，让输入法处理选词
+             }
+             
+             // Shift键可能用于切换输入法
+             if (e.key === 'Shift') {
+                 return; // 不阻止默认行为
+             }
+             
+             // 方向键和删除键应该正常工作
+             if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Backspace', 'Delete'].includes(e.key)) {
+                 return; // 不阻止默认行为
+             }
+         } else {
+             // 非组合输入状态下的处理
+             
              // 处理其他特殊字符
              const specialChars = ['#', '*', '>', '`', '-', '+', '=', '[', ']', '(', ')', '!', '@'];
              if (specialChars.includes(e.key)) {
@@ -319,15 +333,11 @@ import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEve
          }
      }, [editorEl, isComposing, composed, handleMarkdownCommand, resetEditorState]);
  
-     // 添加全局键盘事件监听 - 增强版
+     // 添加全局键盘事件监听
      useEffect(() => {
          const handleGlobalKeyDown = (e: KeyboardEvent) => {
-             // 重置触发键列表：Enter, Shift, 数字键1-9, Delete, Backspace
-             const resetTriggerKeys = ['Enter', 'Shift', 'Delete', 'Backspace', 
-                 '1', '2', '3', '4', '5', '6', '7', '8', '9', '0'];
-                 
-             // 如果按下了重置触发键，立即重置编辑器状态
-             if (resetTriggerKeys.includes(e.key)) {
+             // 监听 Shift 键和 Enter 键
+             if (e.key === 'Shift' || (e.key === 'Enter' && !isComposing)) {
                  setTimeout(() => {
                      resetEditorState();
                  }, 10);
@@ -341,7 +351,7 @@ import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEve
              // 移除全局事件监听
              document.removeEventListener('keydown', handleGlobalKeyDown);
          };
-     }, [resetEditorState]);
+     }, [isComposing, resetEditorState]);
  
      return (
          <>
