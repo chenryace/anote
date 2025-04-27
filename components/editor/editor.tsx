@@ -157,9 +157,10 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         <>
             <MarkdownEditor
                 readOnly={readOnly}
+                key={note?.id} // Re-add key prop
                 id={note?.id}
                 ref={editorEl}
-                value={mounted ? localContent || note?.content || '' : ''}
+                defaultValue={note?.content || ''} // Use initial note content for defaultValue
                 onChange={onEditorChange}
                 placeholder={dictionary.editorPlaceholder}
                 theme={editorTheme}
