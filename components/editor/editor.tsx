@@ -34,7 +34,6 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         saveNote,
     } = EditorState.useContainer();
     const height = use100vh();
-    const mounted = useMounted();
     const editorTheme = useEditorTheme();
     const [hasMinHeight, setHasMinHeight] = useState(true);
     const toast = useToast();
