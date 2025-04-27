@@ -65,33 +65,28 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
     }, []);
 
     // 修改编辑器变化处理
-    const handleEditorChange = useCallback(() => {
-        if (!editorEl.current || !editorEl.current.view) return;
-        
-        const { state } = editorEl.current.view;
-        const content = state.doc.textContent;
-        
-        // 只在非组合输入状态下更新
-        if (!isComposing) {
-            // 更新localStorage
-            if (note?.id) {
-                try {
-                    const notes = JSON.parse(localStorage.getItem('notes') || '{}');
-                    notes[note.id] = {
-                        ...note,
-                        content,
-                        updatedAt: new Date().toISOString()
-                    };
-                    localStorage.setItem('notes', JSON.stringify(notes));
-                } catch (err) {
-                    console.error('Failed to save to localStorage:', err);
-                }
+    // 自定义onChange处理，确保在组合输入期间不会打断输入
+    const handleEditorChange = useCallback(
+        (value: () => string) => {
+            // 如果正在组合输入，不立即触发onChange
+            if (isComposing) {
+                console.log('组合输入中，延迟处理onChange');
+                return;
             }
             
-            // 调用原始的onChange处理
-            onEditorChange(() => content);
-        }
-    }, [isComposing, onEditorChange, note]);
+            // 如果需要处理特殊字符，不立即触发onChange
+            if (needsSpecialCharHandling.current) {
+                console.log('需要处理特殊字符，延迟处理onChange');
+                setTimeout(() => {
+                    onEditorChange(value);
+                }, 10); // 减少延迟时间
+                return;
+            }
+            
+            // 否则正常处理onChange
+            onEditorChange(value);
+        },
+        [isComposing, onEditorChange, note]);
 
     // 修改Markdown命令处理
     const handleMarkdownCommand = useCallback((command: string) => {
