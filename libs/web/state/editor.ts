@@ -23,7 +23,6 @@ import UIState from './ui';
 import NoteTreeState from './tree';
 import NoteState from './note';
 import localStorageService from 'libs/web/storage/local-storage-service';
-import { extractTitleFromContent } from 'libs/web/utils/markdown';
 
 const onSearchLink = async (keyword: string) => {
     const list = await searchNote(keyword, NOTE_DELETED.NORMAL);
@@ -264,7 +263,6 @@ const useEditor = (initNote?: NoteModel) => {
             if (isSaving) return; // 如果正在保存，则忽略更改
 
             const content = getValue();
-            const title = extractTitleFromContent(content);
 
             // 立即更新本地状态以反映更改
             setLocalContent(content);
