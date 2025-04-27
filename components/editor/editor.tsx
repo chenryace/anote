@@ -1,425 +1,205 @@
-import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEvent, useRef, CompositionEvent as ReactCompositionEvent } from 'react';
- import { use100vh } from 'react-div-100vh';
- import MarkdownEditor, { Props } from '@notea/rich-markdown-editor';
- import { useEditorTheme } from './theme';
- import useMounted from 'libs/web/hooks/use-mounted';
- import Tooltip from './tooltip';
- import extensions from './extensions';
- import EditorState from 'libs/web/state/editor';
- import { useToast } from 'libs/web/hooks/use-toast';
- import { useDictionary } from './dictionary';
- import { useEmbeds } from './embeds';
- 
- export interface EditorProps extends Pick<Props, 'readOnly'> {
-     isPreview?: boolean;
- }
- 
- const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
-     const {
-         onSearchLink,
-         onCreateLink,
-         onClickLink,
-         onUploadImage,
-         onHoverLink,
-         onEditorChange,
-         backlinks,
-         editorEl,
-         note,
-     } = EditorState.useContainer();
-     const height = use100vh();
-     const mounted = useMounted();
-     const editorTheme = useEditorTheme();
-     const [hasMinHeight, setHasMinHeight] = useState(true);
-     const toast = useToast();
-     const dictionary = useDictionary();
-     const embeds = useEmbeds();
- 
-     // 状态管理 - 增强版
-     const [isComposing, setIsComposing] = useState(false);
-     const isEditorLocked = useRef(false);
-     const lastInputValue = useRef("");
-     const compositionStateRef = useRef({
-         isActive: false,           // 当前是否处于组合输入状态
-         startTime: 0,              // 组合输入开始时间
-         endTime: 0,                // 组合输入结束时间
-         lastSelection: { from: 0, to: 0 } // 上次选择范围
-     });
- 
-     useEffect(() => {
-         if (isPreview) return;
-         setHasMinHeight((backlinks?.length ?? 0) <= 0);
-     }, [backlinks, isPreview]);
- 
-     // 处理Markdown命令
-     const handleMarkdownCommand = useCallback((command: string) => {
-         if (!editorEl.current || !editorEl.current.view) return;
- 
-         console.log(`处理Markdown命令: ${command}`);
- 
-         // 延迟处理，确保浏览器完成组合输入处理
-         setTimeout(() => {
-             if (editorEl.current && editorEl.current.view) {
-                 // 刷新视图，确保格式化正确应用
-                 editorEl.current.view.dispatch(editorEl.current.view.state.tr);
-             }
-         }, 10);
-     }, [editorEl]);
- 
-     // 修改组合输入更新事件处理 - 使用React事件类型
-     const handleCompositionUpdate = useCallback((_e: ReactCompositionEvent) => {
-         // 记录组合输入过程中的状态
-         compositionStateRef.current.isActive = true;
-     }, []);
- 
-     // 修改编辑器变化处理
-     const handleEditorChange = useCallback(() => {
-         if (!editorEl.current || !editorEl.current.view) return;
- 
-         const { state } = editorEl.current.view;
-         const content = state.doc.textContent;
- 
-         // 只在非组合输入状态下更新
-         if (!isComposing) {
-             // 更新localStorage
-             if (note?.id) {
-                 try {
-                     const notes = JSON.parse(localStorage.getItem('notes') || '{}');
-                     notes[note.id] = {
-                         ...note,
-                         content,
-                         updatedAt: new Date().toISOString()
-                     };
-                     localStorage.setItem('notes', JSON.stringify(notes));
-                 } catch (err) {
-                     console.error('Failed to save to localStorage:', err);
-                 }
-             }
- 
-             // 调用原始的onChange处理
-             onEditorChange(() => content);
-         }
-     }, [isComposing, onEditorChange, note]);
- 
-     // 修改组合输入开始处理 - 使用React事件类型
-     const handleCompositionStart = useCallback((e: ReactCompositionEvent) => {
-         console.log('组合输入开始', e.type);
-         setIsComposing(true);
-         isEditorLocked.current = true;
- 
-         // 更新组合输入状态
-         compositionStateRef.current.isActive = true;
-         compositionStateRef.current.startTime = Date.now();
- 
-         // 保存当前光标位置的内容
-         if (editorEl.current && editorEl.current.view) {
-             const { state } = editorEl.current.view;
-             const { from, to } = state.selection;
-             lastInputValue.current = state.doc.textBetween(from, to);
-             compositionStateRef.current.lastSelection = { from, to };
-         }
-     }, [editorEl]);
- 
-     // 修改组合输入结束处理 - 使用React事件类型
-     const handleCompositionEnd = useCallback((e: ReactCompositionEvent) => {
-         console.log('组合输入结束', e.type);
-         setIsComposing(false);
-         isEditorLocked.current = false;
- 
-         // 更新组合输入状态
-         compositionStateRef.current.isActive = false;
-         compositionStateRef.current.endTime = Date.now();
- 
-         if (editorEl.current && editorEl.current.view) {
-             const { state } = editorEl.current.view;
-             const { from, to } = state.selection;
-             const currentValue = state.doc.textBetween(from, to);
- 
-             // 检查是否有重复输入
-             if (currentValue.includes(lastInputValue.current) && 
-                 currentValue.length > lastInputValue.current.length) {
-                 // 如果检测到重复输入，只保留新输入的内容
-                 const newContent = currentValue.slice(lastInputValue.current.length);
-                 editorEl.current.view.dispatch(
-                     state.tr
-                         .delete(from, to)
-                         .insertText(newContent, from)
-                 );
-             }
- 
-             // 更新最后一次输入值
-             lastInputValue.current = currentValue;
-         }
- 
-         // 延迟触发编辑器变化，确保浏览器完成组合输入处理
-         setTimeout(() => {
-             handleEditorChange();
-         }, 10);
-     }, [editorEl, handleEditorChange]);
- 
-     // 添加 composed 函数
-     const composed = useCallback(() => {
-         if (isComposing) {
-             setIsComposing(false);
-             isEditorLocked.current = false;
-             // 手动触发 compositionend 事件
-             if (editorEl.current && editorEl.current.element) {
-                 editorEl.current.element.dispatchEvent(new Event('compositionend'));
-             }
-         }
-     }, [isComposing, editorEl]);
- 
- 
-     // 添加安全机制，防止编辑器永久锁定
-     useEffect(() => {
-         const safetyTimer = setInterval(() => {
-             // 如果编辑器锁定但不在组合输入状态，强制解锁
-             if (isEditorLocked.current && !isComposing) {
-                 console.log('安全机制：强制解锁编辑器');
-                 isEditorLocked.current = false;
-             }
- 
-             // 检查组合输入状态是否异常
-             const now = Date.now();
-             if (compositionStateRef.current.isActive && 
-                 (now - compositionStateRef.current.startTime > 10000)) {
-                 console.log('安全机制：检测到异常的组合输入状态，强制结束');
-                 compositionStateRef.current.isActive = false;
-                 setIsComposing(false);
-                 isEditorLocked.current = false;
-             }
-         }, 5000); // 每5秒检查一次
- 
-         return () => clearInterval(safetyTimer);
-     }, [isComposing]);
- 
-     // 设置编辑器事件监听 - 移除DOM事件监听，改用React事件系统
-     useEffect(() => {
-         if (!editorEl.current || isPreview || readOnly) return;
- 
-         // 不再需要手动添加DOM事件监听器，使用React事件系统
- 
-         return () => {
-             // 清理代码保留为空函数
-         };
-     }, [editorEl, isPreview, readOnly]);
- 
-     // 添加输入事件处理函数
-     const handleInput = useCallback((e: React.FormEvent<HTMLDivElement>) => {
-         console.log('输入事件', e.type);
-     }, []);
- 
-     // 添加重置编辑器状态的函数 - 移到 handleKeyDown 之前
-     const resetEditorState = useCallback(() => {
-         console.log('重置编辑器状态');
-         setIsComposing(false);
-         isEditorLocked.current = false;
-         compositionStateRef.current.isActive = false;
- 
-         // 强制刷新编辑器视图
-         if (editorEl.current && editorEl.current.view) {
-             editorEl.current.view.dispatch(editorEl.current.view.state.tr);
-         }
-     }, [editorEl]);
- 
-     // 添加键盘事件处理函数
-     const handleKeyDown = useCallback((e: ReactKeyboardEvent) => {
-         console.log(`键盘事件: ${e.key}, 组合状态: ${isComposing}`);
-         
-         // 处理 Enter 键 - 换行后重置编辑器状态
-         if (e.key === 'Enter' && !isComposing) {
-             // 允许默认行为执行
-             setTimeout(() => {
-                 resetEditorState();
-             }, 10);
-         }
-         
-         // 处理 Shift 键 - 可能是切换输入法，重置编辑器状态
-         if (e.key === 'Shift') {
-             setTimeout(() => {
-                 resetEditorState();
-             }, 10);
-             return; // 不阻止默认行为
-         }
-         
-         // 处理 / 键 - 无论在什么状态下都应该触发命令菜单
-         if (e.key === '/') {
-             // 如果在组合输入状态，先结束组合输入
-             if (isComposing) {
-                 composed();
-             }
-             
-             // 强制重置编辑器状态
-             resetEditorState();
-             
-             e.preventDefault();
-             
-             if (editorEl.current && editorEl.current.view) {
-                 const { state } = editorEl.current.view;
-                 const { from, to } = state.selection;
-                 
-                 // 插入 / 字符
-                 editorEl.current.view.dispatch(
-                     state.tr
-                         .delete(from, to)
-                         .insertText('/', from)
-                 );
-                 
-                 // 触发命令菜单
-                 setTimeout(() => {
-                     if (editorEl.current && editorEl.current.view) {
-                         editorEl.current.view.dispatch(
-                             editorEl.current.view.state.tr.setMeta('show-command-menu', true)
-                         );
-                     }
-                 }, 10);
-             }
-             return;
-         }
-         
-         // 处理Markdown快捷键
-         if (!isComposing && e.ctrlKey) {
-             if (e.key === 'b') {
-                 // 粗体
-                 handleMarkdownCommand('bold');
-                 return;
-             } else if (e.key === 'i') {
-                 // 斜体
-                 handleMarkdownCommand('italic');
-                 return;
-             }
-         }
-         
-         // 处理组合输入状态下的按键
-         if (isComposing) {
-             // 数字键1-9通常用于中文输入法选词
-             if (/^[1-9]$/.test(e.key)) {
-                 return; // 不阻止默认行为，让输入法处理选词
-             }
-             
-             // Enter键通常用于确认选词
-             if (e.key === 'Enter') {
-                 return; // 不阻止默认行为，让输入法处理选词
-             }
-             
-             // Shift键可能用于切换输入法
-             if (e.key === 'Shift') {
-                 return; // 不阻止默认行为
-             }
-             
-             // 方向键和删除键应该正常工作
-             if (['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Backspace', 'Delete'].includes(e.key)) {
-                 return; // 不阻止默认行为
-             }
-         } else {
-             // 非组合输入状态下的处理
-             
-             // 处理其他特殊字符
-             const specialChars = ['#', '*', '>', '`', '-', '+', '=', '[', ']', '(', ')', '!', '@'];
-             if (specialChars.includes(e.key)) {
-                 e.preventDefault();
-                 
-                 if (editorEl.current && editorEl.current.view) {
-                     const { state } = editorEl.current.view;
-                     const { from, to } = state.selection;
-                     
-                     // 插入命令字符
-                     editorEl.current.view.dispatch(
-                         state.tr
-                             .delete(from, to)
-                             .insertText(e.key, from)
-                     );
-                 }
-             }
-         }
-     }, [editorEl, isComposing, composed, handleMarkdownCommand, resetEditorState]);
- 
-     // 添加全局键盘事件监听
-     useEffect(() => {
-         const handleGlobalKeyDown = (e: KeyboardEvent) => {
-             // 监听 Shift 键和 Enter 键
-             if (e.key === 'Shift' || (e.key === 'Enter' && !isComposing)) {
-                 setTimeout(() => {
-                     resetEditorState();
-                 }, 10);
-             }
-         };
- 
-         // 添加全局事件监听
-         document.addEventListener('keydown', handleGlobalKeyDown);
- 
-         return () => {
-             // 移除全局事件监听
-             document.removeEventListener('keydown', handleGlobalKeyDown);
-         };
-     }, [isComposing, resetEditorState]);
- 
-     return (
-         <>
-             <div 
-                 onKeyDown={handleKeyDown}
-                 onCompositionStart={handleCompositionStart}
-                 onCompositionUpdate={handleCompositionUpdate}
-                 onCompositionEnd={handleCompositionEnd}
-                 onInput={handleInput}
-             >
-                 <MarkdownEditor
-                     readOnly={readOnly}
-                     id={note?.id}
-                     ref={editorEl}
-                     value={mounted ? note?.content : ''}
-                     onChange={handleEditorChange}
-                     placeholder={dictionary.editorPlaceholder}
-                     theme={editorTheme}
-                     uploadImage={(file) => onUploadImage(file, note?.id)}
-                     onSearchLink={onSearchLink}
-                     onCreateLink={onCreateLink}
-                     onClickLink={onClickLink}
-                     onHoverLink={onHoverLink}
-                     onShowToast={toast}
-                     dictionary={dictionary}
-                     tooltip={Tooltip}
-                     extensions={extensions}
-                     className="px-4 md:px-0"
-                     embeds={embeds}
-                 />
-             </div>
-             <style jsx global>{`
-                 .ProseMirror ul {
-                     list-style-type: disc;
-                 }
- 
-                 .ProseMirror ol {
-                     list-style-type: decimal;
-                 }
- 
-                 .ProseMirror {
-                     ${hasMinHeight
-                         ? `min-height: calc(${
-                               height ? height + 'px' : '100vh'
-                           } - 14rem);`
-                         : ''}
-                     padding-bottom: 10rem;
-                 }
- 
-                 .ProseMirror h1 {
-                     font-size: 2.8em;
-                 }
-                 .ProseMirror h2 {
-                     font-size: 1.8em;
-                 }
-                 .ProseMirror h3 {
-                     font-size: 1.5em;
-                 }
-                 .ProseMirror a:not(.bookmark) {
-                     text-decoration: underline;
-                 }
- 
-                 .ProseMirror .image .ProseMirror-selectednode img {
-                     pointer-events: unset;
-                 }
-             `}</style>
-         </>
-     );
- };
- 
- export default Editor;
+import { FC, useCallback, useEffect, useState } from 'react';
+import { use100vh } from 'react-div-100vh';
+import useMounted from 'libs/web/hooks/use-mounted';
+import { useToast } from 'libs/web/hooks/use-toast';
+import EditorState from 'libs/web/state/editor';
+import { useMarkdownEditor, MarkdownEditorView } from '@gravity-ui/markdown-editor';
+import '@gravity-ui/markdown-editor/dist/index.css';
+import { configure } from '@gravity-ui/markdown-editor';
+import { useGravityTheme as useEditorTheme } from './theme-adapter';
+import { useDictionary } from './dictionary';
+
+export interface EditorProps {
+    readOnly?: boolean;
+    isPreview?: boolean;
+}
+
+const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
+    // 初始化编辑器配置
+    // 初始化编辑器配置
+    useEffect(() => {
+        // Gravity UI只支持'ru'、'en'或undefined作为语言选项
+        configure({
+            lang: 'en'
+        });
+    }, []);
+    const {
+        onClickLink,
+        onUploadImage,
+        onHoverLink,
+        onEditorChange,
+        backlinks,
+        editorEl,
+        note,
+        localContent,
+        editorKey,
+    } = EditorState.useContainer();
+    const height = use100vh();
+    const mounted = useMounted();
+    // 使用编辑器主题
+    const editorTheme = useEditorTheme();
+    const [hasMinHeight, setHasMinHeight] = useState(true);
+    const toast = useToast();
+    const dictionary = useDictionary();
+    
+    // 初始化时设置最小高度
+    useEffect(() => {
+        if (isPreview) return;
+        setHasMinHeight((backlinks?.length ?? 0) <= 0);
+    }, [backlinks, isPreview]);
+    
+    // 创建编辑器实例
+    const editor = useMarkdownEditor({
+        allowHTML: true,
+        autoFocus: !readOnly,
+        placeholder: dictionary.editorPlaceholder,
+        theme: editorTheme === 'dark' ? 'dark' : 'light',
+    });
+    
+    // 将编辑器实例保存到ref中
+    useEffect(() => {
+        if (editor && editorEl) {
+            editorEl.current = editor;
+        }
+    }, [editor, editorEl]);
+    
+    // 设置编辑器初始内容
+    useEffect(() => {
+        if (editor && mounted && localContent) {
+            editor.setValue(localContent);
+        }
+    }, [editor, mounted, localContent, editorKey]);
+    
+    // 处理编辑器内容变化
+    useEffect(() => {
+        if (!editor) return;
+        
+        const handleChange = () => {
+            const value = editor.getValue();
+            onEditorChange(() => value);
+        };
+        
+        editor.on('change', handleChange);
+        return () => {
+            editor.off('change', handleChange);
+        };
+    }, [editor, onEditorChange]);
+    
+    // 处理图片上传
+    const handleImageUpload = useCallback(async (file: File) => {
+        try {
+            const url = await onUploadImage(file, note?.id);
+            return url;
+        } catch (error) {
+            console.error('图片上传失败', error);
+            toast('图片上传失败', 'error');
+            return null;
+        }
+    }, [note?.id, onUploadImage, toast]);
+    
+    // 处理链接点击
+    const handleLinkClick = useCallback((href: string, event: React.MouseEvent) => {
+        event.preventDefault();
+        onClickLink(href);
+    }, [onClickLink]);
+    
+    // 处理链接悬停
+    const handleLinkHover = useCallback((event: React.MouseEvent) => {
+        onHoverLink(event);
+    }, [onHoverLink]);
+    
+    // 根据编辑状态决定是否显示工具栏
+    const [isEditing, setIsEditing] = useState(false);
+    
+    // 监听编辑器焦点状态
+    useEffect(() => {
+        if (!editor || readOnly) return;
+        
+        const handleFocus = () => setIsEditing(true);
+        const handleBlur = () => setIsEditing(false);
+        
+        editor.on('focus', handleFocus);
+        editor.on('blur', handleBlur);
+        
+        return () => {
+            editor.off('focus', handleFocus);
+            editor.off('blur', handleBlur);
+        };
+    }, [editor, readOnly]);
+    
+    // 工具栏配置在MarkdownEditorView组件中自动处理
+
+    // 如果编辑器未初始化，显示加载状态
+    if (!editor) {
+        return <div className="p-4">加载编辑器中...</div>;
+    }
+    
+    return (
+        <>
+            <div key={editorKey} className="markdown-editor-container">
+                <MarkdownEditorView
+                    editor={editor}
+                    stickyToolbar
+                    uploadImage={handleImageUpload}
+                    onLinkClick={handleLinkClick}
+                    onLinkHover={handleLinkHover}
+                    className={`px-4 md:px-0 ${readOnly || (!isEditing && !isPreview) ? 'toolbar-hidden' : ''}`}
+                    readOnly={readOnly}
+                />
+            </div>
+            <style jsx global>{`
+                .markdown-editor-container {
+                    ${hasMinHeight
+                        ? `min-height: calc(${
+                              height ? height + 'px' : '100vh'
+                          } - 14rem);`
+                        : ''}
+                }
+                
+                .markdown-editor-container .g-markdown-editor {
+                    border: none;
+                    background: transparent;
+                }
+                
+                .markdown-editor-container .g-markdown-editor__toolbar {
+                    position: sticky;
+                    top: 0;
+                    z-index: 10;
+                    background: var(--g-color-base-background);
+                    border-bottom: 1px solid var(--g-color-line-generic);
+                    padding: 8px 0;
+                    transition: opacity 0.3s ease, transform 0.3s ease;
+                }
+                
+                .markdown-editor-container.toolbar-hidden .g-markdown-editor__toolbar,
+                .toolbar-hidden .g-markdown-editor__toolbar {
+                    opacity: 0;
+                    transform: translateY(-100%);
+                    pointer-events: none;
+                }
+                
+                .markdown-editor-container .g-markdown-editor__content {
+                    padding-bottom: 10rem;
+                }
+                
+                .markdown-editor-container h1 {
+                    font-size: 2.8em;
+                }
+                
+                .markdown-editor-container h2 {
+                    font-size: 1.8em;
+                }
+                
+                .markdown-editor-container h3 {
+                    font-size: 1.5em;
+                }
+                
+                .markdown-editor-container a:not(.bookmark) {
+                    text-decoration: underline;
+                }
+            `}</style>
+        </>
+    );
+};
+
+export default Editor;
