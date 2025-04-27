@@ -266,7 +266,6 @@ const useEditor = (initNote?: NoteModel) => {
 
             // 立即更新本地状态以反映更改
             setLocalContent(content);
-            setLocalTitle(title);
             setHasLocalChanges(true);
 
             // 立即将更改保存到localStorage
