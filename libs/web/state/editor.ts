@@ -102,13 +102,13 @@ const useEditor = (initNote?: NoteModel) => {
                     setHasLocalChanges(false);
                 }
                 
-                // 强制编辑器重新渲染
-                setEditorKey(prev => prev + 1);
+                // 移除强制重新渲染，避免光标跳动问题
+                // setEditorKey(prev => prev + 1);
             };
             
             loadLocalData();
         }
-    }, [note]);
+    }, [note?.id]); // 只在笔记ID变化时重新加载，而不是笔记内容变化时
     
     // 定期清理过期的localStorage数据
     useEffect(() => {
@@ -259,20 +259,26 @@ const useEditor = (initNote?: NoteModel) => {
     
     // 优化编辑器内容变更处理
     const onEditorChange = useCallback(
-        (value: () => string): void => {
-            const newContent = value();
-            console.log('编辑器内容变更', { length: newContent.length });
-            
-            // 更新本地状态
-            setLocalContent(newContent);
+        (getValue: () => string) => {
+            if (isSaving) return; // 如果正在保存，则忽略更改
+
+            const content = getValue();
+            const title = extractTitleFromContent(content);
+
+            // 立即更新本地状态以反映更改
+            setLocalContent(content);
+            setLocalTitle(title);
             setHasLocalChanges(true);
-            
-            // 使用防抖保存到localStorage
+
+            // 立即将更改保存到localStorage
             if (note?.id) {
-                debouncedSaveToLocalStorage.callback(note.id, newContent, localTitle);
+                localStorageService.saveNote(note.id, { content, title, lastModified: Date.now() });
             }
+
+            // 触发防抖保存到后端
+            onNoteChange({ content, title });
         },
-        [note, localTitle, debouncedSaveToLocalStorage]
+        [note?.id, onNoteChange, isSaving] // 包含 isSaving 依赖
     );
     
     // 优化标题变更处理
@@ -343,8 +349,8 @@ const useEditor = (initNote?: NoteModel) => {
                 await treeState.initTree();
             }
             
-            // 强制编辑器重新渲染，解决Markdown渲染问题
-            setEditorKey(prev => prev + 1);
+            // 移除强制重新渲染，避免光标位置丢失
+            // 保存操作不应该影响编辑器的渲染状态
             
             // 显示保存成功提示
             toast('保存成功', 'success');
@@ -397,8 +403,8 @@ const useEditor = (initNote?: NoteModel) => {
                 .catch(error => console.error('清除localStorage失败', error));
         }
         
-        // 强制编辑器重新渲染，解决Markdown渲染问题
-        setEditorKey(prev => prev + 1);
+        // 移除强制重新渲染，避免光标跳动
+        // setEditorKey(prev => prev + 1);
         
         toast('已丢弃更改', 'info');
     }, [note, toast]);
