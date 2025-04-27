@@ -22,6 +22,7 @@ import { has } from 'lodash';
 import UIState from './ui';
 import NoteTreeState from './tree';
 import NoteState from './note';
+import localStorageService from 'libs/web/storage/local-storage-service';}
 
 const onSearchLink = async (keyword: string) => {
     const list = await searchNote(keyword, NOTE_DELETED.NORMAL);
@@ -59,6 +60,7 @@ const useEditor = (initNote?: NoteModel) => {
     const [hasLocalChanges, setHasLocalChanges] = useState<boolean>(false);
     const [localContent, setLocalContent] = useState<string>('');
     const [localTitle, setLocalTitle] = useState<string>('');
+    const [isSaving, setIsSaving] = useState<boolean>(false);
     
     // 添加编辑器渲染状态
     const [editorKey, setEditorKey] = useState<number>(0);
@@ -68,41 +70,69 @@ const useEditor = (initNote?: NoteModel) => {
         if (note) {
             console.log('初始化编辑器内容', { id: note.id, content: note.content });
             
-            // 始终优先使用服务器数据
-            setLocalContent(note.content || '');
-            setLocalTitle(note.title || '');
-            setHasLocalChanges(false);
+            // 检查localStorage中是否有未保存的内容
+            const loadLocalData = async () => {
+                if (note.id) {
+                    try {
+                        const localData = await localStorageService.getNote(note.id);
+                        
+                        if (localData) {
+                            // 如果本地有数据，使用本地数据
+                            setLocalContent(localData.content || '');
+                            setLocalTitle(localData.title || '');
+                            setHasLocalChanges(true);
+                            console.log('从localStorage恢复未保存内容', { noteId: note.id });
+                        } else {
+                            // 否则使用服务器数据
+                            setLocalContent(note.content || '');
+                            setLocalTitle(note.title || '');
+                            setHasLocalChanges(false);
+                        }
+                    } catch (error) {
+                        console.error('从localStorage加载数据失败', error);
+                        // 出错时使用服务器数据
+                        setLocalContent(note.content || '');
+                        setLocalTitle(note.title || '');
+                        setHasLocalChanges(false);
+                    }
+                } else {
+                    // 新笔记，使用服务器数据
+                    setLocalContent(note.content || '');
+                    setLocalTitle(note.title || '');
+                    setHasLocalChanges(false);
+                }
+                
+                // 强制编辑器重新渲染
+                setEditorKey(prev => prev + 1);
+            };
             
-            // 清除localStorage中可能存在的旧数据
-            if (note.id) {
-                localStorage.removeItem(`note_content_${note.id}`);
-                localStorage.removeItem(`note_title_${note.id}`);
-            }
-            
-            // 强制编辑器重新渲染
-            setEditorKey(prev => prev + 1);
-            
-            // 清除与当前笔记无关的缓存
-            clearIrrelevantCache(note.id);
+            loadLocalData();
         }
     }, [note]);
     
-    // 清除与当前笔记无关的缓存
-    const clearIrrelevantCache = useCallback(async (currentNoteId: string) => {
-        try {
-            console.log('清除与当前笔记无关的缓存', currentNoteId);
-            const keys = await noteCache.keys();
-            
-            // 保留当前笔记的缓存，清除其他缓存
-            const keysToRemove = keys.filter(id => id !== currentNoteId);
-            
-            if (keysToRemove.length > 0) {
-                console.log(`清除 ${keysToRemove.length} 个缓存项`);
-                await Promise.all(keysToRemove.map(id => noteCache.removeItem(id)));
+    // 定期清理过期的localStorage数据
+    useEffect(() => {
+        const cleanupInterval = setInterval(async () => {
+            try {
+                // 获取所有笔记
+                const notes = await localStorageService.getUnsyncedNotes();
+                
+                // 找出超过7天未修改的笔记
+                const now = Date.now();
+                const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+                
+                for (const note of notes) {
+                    if (note.lastModified < sevenDaysAgo) {
+                        console.log('清除过期笔记', note.id);
+                        await localStorageService.deleteNote(note.id);
+                    }
+                }
+            } catch (error) {
+                console.error('清理过期数据失败', error);
             }
-        } catch (error) {
-            console.error('清除缓存失败', error);
-        }
+        }, 24 * 60 * 60 * 1000); // 每24小时执行一次
+        
+        return () => clearInterval(cleanupInterval);
     }, []);
 
     const onNoteChange = useDebouncedCallback(
@@ -213,7 +243,21 @@ const useEditor = (initNote?: NoteModel) => {
         setBackLinks(linkNotes);
     }, [note?.id]);
 
-    // 修改为不再自动保存的版本
+    // 使用防抖处理编辑器内容变更，避免频繁保存
+    const debouncedSaveToLocalStorage = useDebouncedCallback(
+        async (noteId: string, content?: string, title?: string) => {
+            if (!noteId) return;
+            
+            try {
+                await localStorageService.saveNote(noteId, content, title);
+            } catch (error) {
+                console.error('保存到localStorage失败', error);
+            }
+        },
+        500 // 500毫秒防抖延迟
+    );
+    
+    // 优化编辑器内容变更处理
     const onEditorChange = useCallback(
         (value: () => string): void => {
             const newContent = value();
@@ -223,15 +267,15 @@ const useEditor = (initNote?: NoteModel) => {
             setLocalContent(newContent);
             setHasLocalChanges(true);
             
-            // 保存到localStorage作为备份
+            // 使用防抖保存到localStorage
             if (note?.id) {
-                localStorage.setItem(`note_content_${note.id}`, newContent);
+                debouncedSaveToLocalStorage(note.id, newContent, localTitle);
             }
         },
-        [note]
+        [note, localTitle, debouncedSaveToLocalStorage]
     );
     
-    // 添加标题变更处理
+    // 优化标题变更处理
     const onTitleChange = useCallback(
         (title: string): void => {
             console.log('标题变更', { title });
@@ -240,19 +284,21 @@ const useEditor = (initNote?: NoteModel) => {
             setLocalTitle(title);
             setHasLocalChanges(true);
             
-            // 保存到localStorage作为备份
+            // 使用防抖保存到localStorage
             if (note?.id) {
-                localStorage.setItem(`note_title_${note.id}`, title);
+                debouncedSaveToLocalStorage(note.id, localContent, title);
             }
         },
-        [note]
+        [note, localContent, debouncedSaveToLocalStorage]
     );
     
-    // 添加手动保存函数，确保更新元数据和树结构
+    // 优化手动保存函数，确保更新元数据和树结构
     const saveNote = useCallback(async () => {
         if (!note?.id) return false;
+        if (isSaving) return false; // 防止重复保存
         
         try {
+            setIsSaving(true);
             console.log('保存笔记', { id: note?.id, localContent, localTitle });
             
             // 对于新笔记的特殊处理
@@ -286,10 +332,9 @@ const useEditor = (initNote?: NoteModel) => {
             // 清除本地更改标记
             setHasLocalChanges(false);
             
-            // 清除localStorage
+            // 清除localStorage中的笔记数据
             if (note.id) {
-                localStorage.removeItem(`note_content_${note.id}`);
-                localStorage.removeItem(`note_title_${note.id}`);
+                await localStorageService.deleteNote(note.id);
             }
             
             // 保存成功后，刷新树结构以确保侧栏正确显示
@@ -309,11 +354,15 @@ const useEditor = (initNote?: NoteModel) => {
             console.error('保存失败', error);
             toast('保存失败，请重试', 'error');
             return false;
+        } finally {
+            setIsSaving(false);
         }
-    }, [note, localContent, localTitle, updateNote, createNote, router, toast, treeState]);
+    }, [note, localContent, localTitle, updateNote, createNote, router, toast, treeState, isSaving]);
     
-    // 添加带重试的保存函数
+    // 优化带重试的保存函数
     const saveNoteWithRetry = useCallback(async (retryCount = 3) => {
+        if (isSaving) return false; // 防止重复保存
+        
         for (let i = 0; i < retryCount; i++) {
             try {
                 const result = await saveNote();
@@ -329,9 +378,9 @@ const useEditor = (initNote?: NoteModel) => {
             }
         }
         return false;
-    }, [saveNote, toast]);
+    }, [saveNote, toast, isSaving]);
     
-    // 添加丢弃更改函数
+    // 优化丢弃更改函数
     const discardChanges = useCallback(() => {
         if (!note) return;
         
@@ -344,8 +393,8 @@ const useEditor = (initNote?: NoteModel) => {
         
         // 清除localStorage
         if (note.id) {
-            localStorage.removeItem(`note_content_${note.id}`);
-            localStorage.removeItem(`note_title_${note.id}`);
+            localStorageService.deleteNote(note.id)
+                .catch(error => console.error('清除localStorage失败', error));
         }
         
         // 强制编辑器重新渲染，解决Markdown渲染问题
