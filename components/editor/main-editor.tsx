@@ -64,14 +64,37 @@ const EditorContent: FC<{
             if ((e.ctrlKey || e.metaKey) && e.key === 's') {
                 e.preventDefault();
                 if (hasLocalChanges) {
-                    saveNote()
-                        .catch(error => console.error('保存失败', error));
+                    // 查找Editor组件中的handleSave函数
+                    const editorElement = document.querySelector('article');
+                    if (editorElement) {
+                        // 触发自定义事件，让Editor组件处理保存
+                        const saveEvent = new CustomEvent('editor-save-note');
+                        editorElement.dispatchEvent(saveEvent);
+                    } else {
+                        // 如果找不到Editor组件，直接调用saveNote
+                        saveNote()
+                            .catch(error => console.error('保存失败', error));
+                    }
                 }
             }
         };
         
         document.addEventListener('keydown', handleKeyDown);
         return () => document.removeEventListener('keydown', handleKeyDown);
+    }, [hasLocalChanges, saveNote]);
+    
+    // 添加自定义事件处理，用于触发保存操作
+    useEffect(() => {
+        const handleSaveEvent = () => {
+            if (hasLocalChanges) {
+                saveNote()
+                    .catch(error => console.error('保存失败', error));
+            }
+        };
+        
+        // 监听自定义保存事件
+        document.addEventListener('editor-save-note', handleSaveEvent);
+        return () => document.removeEventListener('editor-save-note', handleSaveEvent);
     }, [hasLocalChanges, saveNote]);
     
     // 添加页面离开提示
@@ -109,9 +132,19 @@ const EditorNavButtons: FC = () => {
     
     // 添加保存按钮点击处理
     const handleClickSave = useCallback(
-        async (event: MouseEvent) => {
+        (event: MouseEvent) => {
             event.stopPropagation();
-            await saveNote();
+            
+            // 触发自定义事件，让Editor组件处理保存
+            const editorElement = document.querySelector('article');
+            if (editorElement) {
+                const saveEvent = new CustomEvent('editor-save-note');
+                editorElement.dispatchEvent(saveEvent);
+            } else {
+                // 如果找不到Editor组件，直接调用saveNote
+                saveNote()
+                    .catch(error => console.error('保存失败', error));
+            }
         },
         [saveNote]
     );
