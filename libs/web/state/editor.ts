@@ -263,6 +263,7 @@ const useEditor = (initNote?: NoteModel) => {
             if (isSaving) return; // 如果正在保存，则忽略更改
 
             const content = getValue();
+            // 标题和内容分开处理，不从内容中提取标题
 
             // 立即更新本地状态以反映更改
             setLocalContent(content);
@@ -270,13 +271,17 @@ const useEditor = (initNote?: NoteModel) => {
 
             // 立即将更改保存到localStorage
             if (note?.id) {
-                localStorageService.saveNote( note.id, content, lastModified: Date.now() );
+                try {
+                    localStorageService.saveNote(note.id, content);
+                } catch (error) {
+                    console.error('保存到localStorage失败', error);
+                }
             }
 
-            // 触发防抖保存到后端
-            onNoteChange({ content, title });
+            // 触发防抖保存到后端，只更新内容
+            onNoteChange({ content });
         },
-        [note?.id, onNoteChange, isSaving] // 包含 isSaving 依赖
+        [note?.id, onNoteChange, isSaving] // 移除localTitle依赖，因为不再使用它
     );
     
     // 优化标题变更处理
@@ -288,12 +293,19 @@ const useEditor = (initNote?: NoteModel) => {
             setLocalTitle(title);
             setHasLocalChanges(true);
             
-            // 使用防抖保存到localStorage
+            // 使用防抖保存到localStorage，只更新标题
             if (note?.id) {
-                debouncedSaveToLocalStorage.callback(note.id, localContent, title);
+                try {
+                    localStorageService.saveNote(note.id, undefined, title);
+                } catch (error) {
+                    console.error('保存标题到localStorage失败', error);
+                }
             }
+            
+            // 触发防抖保存到后端，只更新标题
+            onNoteChange({ title });
         },
-        [note, localContent, debouncedSaveToLocalStorage]
+        [note?.id, onNoteChange]
     );
     
     // 优化手动保存函数，确保更新元数据和树结构
