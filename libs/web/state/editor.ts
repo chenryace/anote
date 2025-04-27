@@ -269,7 +269,7 @@ const useEditor = (initNote?: NoteModel) => {
             
             // 使用防抖保存到localStorage
             if (note?.id) {
-                debouncedSaveToLocalStorage(note.id, newContent, localTitle);
+                debouncedSaveToLocalStorage.callback(note.id, newContent, localTitle);
             }
         },
         [note, localTitle, debouncedSaveToLocalStorage]
@@ -286,7 +286,7 @@ const useEditor = (initNote?: NoteModel) => {
             
             // 使用防抖保存到localStorage
             if (note?.id) {
-                debouncedSaveToLocalStorage(note.id, localContent, title);
+                debouncedSaveToLocalStorage.callback(note.id, localContent, title);
             }
         },
         [note, localContent, debouncedSaveToLocalStorage]
