@@ -270,7 +270,7 @@ const useEditor = (initNote?: NoteModel) => {
 
             // 立即将更改保存到localStorage
             if (note?.id) {
-                localStorageService.saveNote(note.id, { content, title, lastModified: Date.now() });
+                localStorageService.saveNote(note.id, { content, lastModified: Date.now() });
             }
 
             // 触发防抖保存到后端
