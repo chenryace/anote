@@ -1,4 +1,3 @@
-
 import { FC, useEffect, useState, useCallback, KeyboardEvent as ReactKeyboardEvent, useRef } from 'react';
 import { use100vh } from 'react-div-100vh';
 import MarkdownEditor, { Props } from '@notea/rich-markdown-editor';
@@ -78,21 +77,14 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             if (note?.id) {
                 try {
                     const notes = JSON.parse(localStorage.getItem('notes') || '{}');
-                    const updatedNote = {
+                    notes[note.id] = {
                         ...note,
-                        content: content || '',  // 确保content不为undefined
-                        updatedAt: new Date().toISOString(),
-                        id: note.id,  // 确保ID存在
-                        title: note.title || '',  // 保留标题
+                        content,
+                        updatedAt: new Date().toISOString()
                     };
-                    notes[note.id] = updatedNote;
                     localStorage.setItem('notes', JSON.stringify(notes));
-                    
-                    // 添加保存确认
-                    console.log('Note saved:', note.id, content?.length);
                 } catch (err) {
                     console.error('Failed to save to localStorage:', err);
-                    toast('保存失败，请检查存储空间是否足够');
                 }
             }
             
