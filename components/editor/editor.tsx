@@ -175,7 +175,8 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                 extensions={extensions}
                 className="px-4 md:px-0"
                 embeds={embeds}
-                key={editorKey} // 添加key以支持强制重新渲染
+                // 注意：不要在这里使用key属性，它会导致编辑器在每次内容变化时重新渲染
+                // 从而导致光标位置丢失问题
             />
             {renderSaveStatus()}
             <style jsx global>{`
