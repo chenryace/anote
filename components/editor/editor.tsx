@@ -54,21 +54,6 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         }
     }, [hasLocalChanges]);
     
-    // 监听自定义保存事件
-    useEffect(() => {
-        const articleElement = document.querySelector('article');
-        if (!articleElement) return;
-        
-        const handleSaveEvent = () => {
-            if (hasLocalChanges) {
-                handleSave();
-            }
-        };
-        
-        articleElement.addEventListener('editor-save-note', handleSaveEvent);
-        return () => articleElement.removeEventListener('editor-save-note', handleSaveEvent);
-    }, [hasLocalChanges, handleSave]);
-    
     // 处理保存操作
     const handleSave = async () => {
         if (!hasLocalChanges || saveStatus === 'saving' || saveStatus === 'uploading' || saveStatus === 'verifying') {
@@ -107,6 +92,21 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
             toast(t('保存失败，请重试'), 'error');
         }
     };
+    
+    // 监听自定义保存事件
+    useEffect(() => {
+        const articleElement = document.querySelector('article');
+        if (!articleElement) return;
+        
+        const handleSaveEvent = () => {
+            if (hasLocalChanges) {
+                handleSave();
+            }
+        };
+        
+        articleElement.addEventListener('editor-save-note', handleSaveEvent);
+        return () => articleElement.removeEventListener('editor-save-note', handleSaveEvent);
+    }, [hasLocalChanges, handleSave]);
     
     // 注意：Ctrl+S快捷键和页面离开提示已移至main-editor.tsx中处理，避免重复绑定事件
     
@@ -182,35 +182,76 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                 .ProseMirror ul {
                     list-style-type: disc;
                 }
-
                 .ProseMirror ol {
                     list-style-type: decimal;
                 }
-
                 .ProseMirror {
-                    ${hasMinHeight
-                        ? `min-height: calc(${
-                              height ? height + 'px' : '100vh'
-                          } - 14rem);`
-                        : ''}
-                    padding-bottom: 10rem;
+                    min-height: ${hasMinHeight ? height ? height - 320 : 500 : 0}px;
+                    padding-bottom: 160px;
                 }
-
-                .ProseMirror h1 {
-                    font-size: 2.8em;
+                .ProseMirror:focus {
+                    outline: none;
                 }
-                .ProseMirror h2 {
-                    font-size: 1.8em;
+                .ProseMirror hr {
+                    visibility: visible;
                 }
-                .ProseMirror h3 {
-                    font-size: 1.5em;
+                .ProseMirror hr:after {
+                    content: none;
                 }
-                .ProseMirror a:not(.bookmark) {
-                    text-decoration: underline;
+                .ProseMirror img {
+                    max-width: 100%;
                 }
-
-                .ProseMirror .image .ProseMirror-selectednode img {
-                    pointer-events: unset;
+                .ProseMirror .image {
+                    text-align: center;
+                }
+                .ProseMirror .image.placeholder {
+                    position: relative;
+                    background-color: var(--placeholder-color);
+                }
+                .ProseMirror .image .caption-input {
+                    margin-top: 0.5em;
+                }
+                .ProseMirror .image.align-start {
+                    float: left;
+                    margin-right: 1.5em;
+                    margin-bottom: 1em;
+                    margin-top: 0.5em;
+                    max-width: 50%;
+                }
+                .ProseMirror .image.align-end {
+                    float: right;
+                    margin-left: 1.5em;
+                    margin-bottom: 1em;
+                    margin-top: 0.5em;
+                    max-width: 50%;
+                }
+                .ProseMirror .image.align-wide {
+                    width: 100%;
+                    max-width: 1024px;
+                    margin-left: auto;
+                    margin-right: auto;
+                }
+                .ProseMirror .image.align-wide img {
+                    max-width: 100%;
+                }
+                .ProseMirror .image.align-wide .caption {
+                    text-align: center;
+                }
+                .ProseMirror .image.align-full {
+                    width: 100vw;
+                    max-width: 100vw;
+                    margin-left: calc(50% - 50vw);
+                    margin-right: calc(50% - 50vw);
+                }
+                .ProseMirror .image.align-full img {
+                    max-width: 100%;
+                }
+                .ProseMirror .image.align-full .caption {
+                    text-align: center;
+                    margin-left: calc(50% - 50vw);
+                    margin-right: calc(50% - 50vw);
+                    max-width: 1024px;
+                    margin: 0 auto;
                 }
             `}</style>
         </>
