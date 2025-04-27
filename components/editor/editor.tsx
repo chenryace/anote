@@ -33,7 +33,6 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         hasLocalChanges,
         localContent,
         saveNote,
-        editorKey,
     } = EditorState.useContainer();
     const height = use100vh();
     const mounted = useMounted();
