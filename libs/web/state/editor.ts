@@ -22,7 +22,7 @@ import { has } from 'lodash';
 import UIState from './ui';
 import NoteTreeState from './tree';
 import NoteState from './note';
-import localStorageService from 'libs/web/storage/local-storage-service';}
+import localStorageService from 'libs/web/storage/local-storage-service';
 
 const onSearchLink = async (keyword: string) => {
     const list = await searchNote(keyword, NOTE_DELETED.NORMAL);
