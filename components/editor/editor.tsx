@@ -1,7 +1,7 @@
 import { FC, useEffect, useState } from 'react';
 import { use100vh } from 'react-div-100vh';
 import MarkdownEditor, { Props } from '@notea/rich-markdown-editor';
-import { useEditorTheme } from './theme';
+import { useEditorTheme, darkTheme } from './theme';
 import Tooltip from './tooltip';
 import extensions from './extensions';
 import EditorState from 'libs/web/state/editor';
@@ -154,7 +154,6 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
         <>
             <MarkdownEditor
                 readOnly={readOnly}
-                key={note?.id} // Re-add key prop
                 id={note?.id}
                 ref={editorEl}
                 defaultValue={note?.content || ''} // Use initial note content for defaultValue
@@ -172,8 +171,15 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                 extensions={extensions}
                 className="px-4 md:px-0"
                 embeds={embeds}
-                // 注意：不要在这里使用key属性，它会导致编辑器在每次内容变化时重新渲染
-                // 从而导致光标位置丢失问题
+                // 启用实时预览和正确的Markdown渲染
+                autoFocus={!readOnly && !isPreview}
+                dark={editorTheme === darkTheme}
+                headingsOffset={0}
+                // 添加以下配置以确保Markdown正确渲染
+                defaultShowMenu={false}
+                defaultValue={note?.content || ''}
+                readOnlyWriteCheckboxes={false}
+                // 移除key属性，避免编辑器在每次内容变化时重新渲染
             />
             {renderSaveStatus()}
             <style jsx global>{`
