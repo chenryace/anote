@@ -177,7 +177,6 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                 headingsOffset={0}
                 // 移除不支持的defaultShowMenu属性
                 // 确保Markdown正确渲染
-                defaultValue={note?.content || ''}
                 readOnlyWriteCheckboxes={false}
                 // 移除key属性，避免编辑器在每次内容变化时重新渲染
             />
