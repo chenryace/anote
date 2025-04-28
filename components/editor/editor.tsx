@@ -175,8 +175,8 @@ const Editor: FC<EditorProps> = ({ readOnly, isPreview }) => {
                 autoFocus={!readOnly && !isPreview}
                 dark={editorTheme === darkTheme}
                 headingsOffset={0}
-                // 添加以下配置以确保Markdown正确渲染
-                defaultShowMenu={false}
+                // 移除不支持的defaultShowMenu属性
+                // 确保Markdown正确渲染
                 defaultValue={note?.content || ''}
                 readOnlyWriteCheckboxes={false}
                 // 移除key属性，避免编辑器在每次内容变化时重新渲染
