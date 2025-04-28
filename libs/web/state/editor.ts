@@ -271,7 +271,7 @@ const useEditor = (initNote?: NoteModel) => {
 
             // 使用防抖函数保存到localStorage
             if (note?.id) {
-                debouncedSaveToLocalStorage(note.id, content);
+                debouncedSaveToLocalStorage.callback(note.id, content);
             }
 
             // 触发防抖保存到后端，只更新内容
@@ -291,7 +291,7 @@ const useEditor = (initNote?: NoteModel) => {
             
             // 使用防抖保存到localStorage，只更新标题
             if (note?.id) {
-                debouncedSaveToLocalStorage(note.id, undefined, title);
+                debouncedSaveToLocalStorage.callback(note.id, undefined, title);
             }
             
             // 触发防抖保存到后端，只更新标题
