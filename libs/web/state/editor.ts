@@ -275,7 +275,7 @@ const useEditor = (initNote?: NoteModel) => {
             }
 
             // 触发防抖保存到后端，只更新内容
-            onNoteChange({ content });
+            onNoteChange.callback({ content });
         },
         [note?.id, onNoteChange, isSaving, debouncedSaveToLocalStorage]
     );
@@ -295,7 +295,7 @@ const useEditor = (initNote?: NoteModel) => {
             }
             
             // 触发防抖保存到后端，只更新标题
-            onNoteChange({ title });
+            onNoteChange.callback({ title });
         },
         [note?.id, onNoteChange, debouncedSaveToLocalStorage]
     );
