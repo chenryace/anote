@@ -140,14 +140,15 @@ const useEditor = (initNote?: NoteModel) => {
             const isNew = has(router.query, 'new');
 
             if (isNew) {
-                data.pid = (router.query.pid as string) || ROOT_ID;
-                const item = await createNote({ ...note, ...data });
-                const noteUrl = `/${item?.id}`;
-
-                if (router.asPath !== noteUrl) {
-                    await router.replace(noteUrl, undefined, { shallow: true });
-                }
+                // 对于新笔记，不要立即创建，而是更新本地状态
+                // 只在saveNote函数中执行实际的创建操作
+                console.log('新笔记内容变更，仅更新本地状态', data);
+                // 更新本地状态，但不触发API调用
+                if (data.content) setLocalContent(data.content);
+                if (data.title) setLocalTitle(data.title);
+                setHasLocalChanges(true);
             } else {
+                // 对于已有笔记，正常更新
                 await updateNote(data);
             }
         },
@@ -330,7 +331,8 @@ const useEditor = (initNote?: NoteModel) => {
                 };
                 
                 console.log('创建新笔记', data);
-                const item = await createNote({ ...note, ...data });
+                // 使用note.id作为笔记ID，避免创建多个笔记
+                const item = await createNote({ id: note.id, ...data });
                 
                 if (!item) {
                     throw new Error('创建笔记失败');
@@ -364,9 +366,6 @@ const useEditor = (initNote?: NoteModel) => {
                 console.log('刷新树结构');
                 await treeState.initTree();
             }
-            
-            // 移除强制重新渲染，避免光标位置丢失
-            // 保存操作不应该影响编辑器的渲染状态
             
             // 显示保存成功提示
             toast('保存成功', 'success');
