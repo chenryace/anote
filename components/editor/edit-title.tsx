@@ -10,7 +10,6 @@ import {
     useMemo,
     ChangeEvent,
     useEffect,
-    useState,
 } from 'react';
 import EditorState from 'libs/web/state/editor';
 
@@ -18,10 +17,6 @@ const EditTitle: FC<{ readOnly?: boolean }> = ({ readOnly }) => {
     const { editorEl, onTitleChange, note, localTitle } = EditorState.useContainer();
     const router = useRouter();
     const inputRef = useRef<HTMLTextAreaElement>(null);
-    const [inputValue, setInputValue] = useState<string>('');
-    const isNewNote = useMemo(() => has(router.query, 'new'), [router.query]);
-    
-    // 处理Enter键按下事件
     const onInputTitle = useCallback(
         (event: KeyboardEvent<HTMLTextAreaElement>) => {
             if (event.key.toLowerCase() === 'enter') {
@@ -33,39 +28,21 @@ const EditTitle: FC<{ readOnly?: boolean }> = ({ readOnly }) => {
         [editorEl]
     );
 
-    // 改进标题变更处理，添加本地状态
+    // 修改为使用新的onTitleChange
     const handleTitleChange = useCallback(
         (event: ChangeEvent<HTMLTextAreaElement>) => {
             const title = event.target.value;
-            setInputValue(title); // 更新本地状态
-            
-            // 对于新笔记，延迟调用onTitleChange，避免在输入过程中触发保存
-            if (isNewNote) {
-                // 使用setTimeout模拟防抖，避免频繁触发
-                setTimeout(() => {
-                    onTitleChange(title);
-                }, 300);
-            } else {
-                // 对于已有笔记，直接更新
-                onTitleChange(title);
-            }
+            onTitleChange(title);
         },
-        [onTitleChange, isNewNote]
+        [onTitleChange]
     );
     
     // 同步本地标题到输入框
     useEffect(() => {
-        if (inputRef.current) {
-            // 如果本地有输入值且是新笔记，优先使用本地输入值
-            if (isNewNote && inputValue) {
-                inputRef.current.value = inputValue;
-            } else if (localTitle !== undefined) {
-                // 否则使用从状态管理器获取的值
-                inputRef.current.value = localTitle;
-                setInputValue(localTitle);
-            }
+        if (inputRef.current && localTitle !== undefined) {
+            inputRef.current.value = localTitle;
         }
-    }, [localTitle, isNewNote, inputValue]);
+    }, [localTitle]);
 
     const autoFocus = useMemo(() => has(router.query, 'new'), [router.query]);
     const { t } = useI18n();
@@ -78,8 +55,8 @@ const EditTitle: FC<{ readOnly?: boolean }> = ({ readOnly }) => {
                 readOnly={readOnly}
                 className="outline-none w-full resize-none block bg-transparent"
                 placeholder={t('New Page')}
-                defaultValue={isNewNote && inputValue ? inputValue : (localTitle || note?.title)}
-                key={isNewNote ? undefined : note?.id} // 对于新笔记，不使用note.id作为key，避免重新渲染
+                defaultValue={localTitle || note?.title}
+                key={note?.id}
                 onKeyPress={onInputTitle}
                 onChange={handleTitleChange}
                 maxLength={128}
