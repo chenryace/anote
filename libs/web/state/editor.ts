@@ -269,19 +269,15 @@ const useEditor = (initNote?: NoteModel) => {
             setLocalContent(content);
             setHasLocalChanges(true);
 
-            // 立即将更改保存到localStorage
+            // 使用防抖函数保存到localStorage
             if (note?.id) {
-                try {
-                    localStorageService.saveNote(note.id, content);
-                } catch (error) {
-                    console.error('保存到localStorage失败', error);
-                }
+                debouncedSaveToLocalStorage(note.id, content);
             }
 
             // 触发防抖保存到后端，只更新内容
             onNoteChange({ content });
         },
-        [note?.id, onNoteChange, isSaving] // 移除localTitle依赖，因为不再使用它
+        [note?.id, onNoteChange, isSaving, debouncedSaveToLocalStorage]
     );
     
     // 优化标题变更处理
@@ -295,17 +291,13 @@ const useEditor = (initNote?: NoteModel) => {
             
             // 使用防抖保存到localStorage，只更新标题
             if (note?.id) {
-                try {
-                    localStorageService.saveNote(note.id, undefined, title);
-                } catch (error) {
-                    console.error('保存标题到localStorage失败', error);
-                }
+                debouncedSaveToLocalStorage(note.id, undefined, title);
             }
             
             // 触发防抖保存到后端，只更新标题
             onNoteChange({ title });
         },
-        [note?.id, onNoteChange]
+        [note?.id, onNoteChange, debouncedSaveToLocalStorage]
     );
     
     // 优化手动保存函数，确保更新元数据和树结构
