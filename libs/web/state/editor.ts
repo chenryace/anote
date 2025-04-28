@@ -292,12 +292,18 @@ const useEditor = (initNote?: NoteModel) => {
             // 使用防抖保存到localStorage，只更新标题
             if (note?.id) {
                 debouncedSaveToLocalStorage.callback(note.id, undefined, title);
+                
+                // 检查是否为新笔记，如果是新笔记，不要立即触发onNoteChange
+                // 这样可以避免在输入标题时就创建笔记
+                const isNew = has(router.query, 'new');
+                if (!isNew) {
+                    // 只有非新笔记才触发防抖保存到后端
+                    onNoteChange.callback({ title });
+                }
+                // 新笔记的标题变更将在手动保存时一起提交
             }
-            
-            // 触发防抖保存到后端，只更新标题
-            onNoteChange.callback({ title });
         },
-        [note?.id, onNoteChange, debouncedSaveToLocalStorage]
+        [note?.id, onNoteChange, debouncedSaveToLocalStorage, router.query]
     );
     
     // 优化手动保存函数，确保更新元数据和树结构
@@ -312,17 +318,25 @@ const useEditor = (initNote?: NoteModel) => {
             // 对于新笔记的特殊处理
             const isNew = has(router.query, 'new');
             if (isNew) {
+                // 检查标题是否为空，如果为空则使用默认标题
+                const title = localTitle || '无标题笔记';
+                
                 // 确保包含必要的元数据，特别是日期和pid
                 const data = {
                     content: localContent,
-                    title: localTitle,
+                    title: title,
                     pid: (router.query.pid as string) || ROOT_ID,
                     date: new Date().toISOString() // 添加日期元数据
                 };
                 
                 console.log('创建新笔记', data);
                 const item = await createNote({ ...note, ...data });
-                const noteUrl = `/${item?.id}`;
+                
+                if (!item) {
+                    throw new Error('创建笔记失败');
+                }
+                
+                const noteUrl = `/${item.id}`;
                 
                 if (router.asPath !== noteUrl) {
                     await router.replace(noteUrl, undefined, { shallow: true });
